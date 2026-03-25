@@ -16,21 +16,23 @@ Kalka uses `czkawka_cli` as its backend, communicating via JSON output for resul
 
 ## Screenshots
 
-> **Note:** To add screenshots, place PNG files in `kalka/screenshots/` and uncomment the lines below.
-
-<!--
 <div align="center">
 
-| Duplicate scan | Similar images | Settings |
-|:-:|:-:|:-:|
-| ![Duplicates](screenshots/duplicates.png) | ![Similar images](screenshots/similar-images.png) | ![Settings](screenshots/settings.png) |
-
-| Side-by-side preview | Dark theme |
+| Duplicate files | Similar images |
 |:-:|:-:|
-| ![Comparison](screenshots/comparison.png) | ![Dark](screenshots/dark-theme.png) |
+| ![Duplicates](screenshots/duplicates.png) | ![Similar images](screenshots/similar-images.png) |
+
+| Similar music | Empty folders |
+|:-:|:-:|
+| ![Similar music](screenshots/similar-music.png) | ![Empty folders](screenshots/empty-folders.png) |
+
+| Broken files | Settings |
+|:-:|:-:|
+| ![Broken files](screenshots/broken-files.png) | ![Settings](screenshots/settings.png) |
 
 </div>
--->
+
+> Screenshots generated with `python take_screenshots.py` (uses `QWidget.grab()` with sample data).
 
 ## Features
 

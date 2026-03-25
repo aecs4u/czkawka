@@ -8,6 +8,7 @@ from PySide6.QtGui import QColor, QBrush, QFont, QAction
 from .models import (
     ActiveTab, ResultEntry, TAB_COLUMNS, GROUPED_TABS, SelectMode
 )
+from .utils import format_size as _format_size
 from .localizer import tr
 
 
@@ -360,7 +361,7 @@ class ResultsView(QWidget):
         total = len(entries)
         total_size = sum(r.values.get("__size_bytes", 0) for r in entries)
         groups = sum(1 for r in self._results if r.header_row)
-        size_str = self._format_size(total_size)
+        size_str = _format_size(total_size)
         if self._active_tab in GROUPED_TABS and groups > 0:
             self._summary_label.setText(tr("results-found-grouped", total=total, size=size_str, groups=groups))
         elif total > 0:
@@ -378,7 +379,7 @@ class ResultsView(QWidget):
         selected_size = sum(r.values.get("__size_bytes", 0) for r in checked)
         if selected > 0:
             self._selection_label.setText(
-                tr("results-selected", selected=selected, total=total, selected_size=self._format_size(selected_size), total_size=self._format_size(total_size))
+                tr("results-selected", selected=selected, total=total, selected_size=_format_size(selected_size), total_size=_format_size(total_size))
             )
         else:
             self._selection_label.setText("")
