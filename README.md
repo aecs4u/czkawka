@@ -1,7 +1,8 @@
 <div align="center"><img src="https://github.com/user-attachments/assets/f5e4b290-d001-4cf4-9f52-dab65a30e441" alt="krokiet_logo" width="600" /></div>
-     
+
 **Krokiet** ((IPA: [ˈkrɔcɛt]), "croquette" in Polish) new generation GUI frontend, simple, multiplatform, fast and free app to remove unnecessary files from your computer.
 
+**Kalka** - Qt/PySide6 GUI frontend for Czkawka Core, offering a modern Python-based desktop interface.
 
 <div align="center"><img src="https://user-images.githubusercontent.com/41945903/102616149-66490400-4137-11eb-9cd6-813b2b070834.png" alt="czkawka_logo" width="600" /></div>
 
@@ -90,12 +91,6 @@ options to choose than other).
 |       Exif cleaner        |      ✔      |        ✔         |                  |    ✔    |        |                   |             |
 |      Video optimizer      |      ✔      |        ✔         |                  |         |        |                   |             |
 |         Bad Names         |      ✔      |        ✔         |                  |    ✔    |        |                   |             |
-|      Names conflict       |             |                  |                  |         |   ✔    |                   |             |
-|    Installed packages     |             |                  |                  |         |   ✔    |                   |             |
-|          Bad ID           |             |                  |                  |         |   ✔    |                   |             |
-|   Non stripped binaries   |             |                  |                  |         |   ✔    |                   |             |
-|   Redundant whitespace    |             |                  |                  |         |   ✔    |                   |             |
-|     Overwriting files     |             |                  |                  |         |   ✔    |                   |      ✔      |
 |     Portable version      |      ✔      |        ✔         |        ✔         |         |        |                   |      ✔      |
 |    Multiple languages     |      ✔      |                  |        ✔         |    ✔    |   ✔    |         ✔         |      ✔      |
 |       Cache support       |      ✔      |        ✔         |        ✔         |    ✔    |        |         ✔         |             |
