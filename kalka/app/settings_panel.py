@@ -115,6 +115,12 @@ class SettingsPanel(QWidget):
         )
         layout.addRow(cache)
 
+        # Clean cache button
+        clean_cache_btn = QPushButton(tr("settings-clean-cache"))
+        clean_cache_btn.setToolTip(tr("settings-clean-cache-tooltip"))
+        clean_cache_btn.clicked.connect(self._clean_cache)
+        layout.addRow(clean_cache_btn)
+
         # Move to trash
         trash = QCheckBox(tr("settings-move-to-trash"))
         trash.setChecked(self._settings.move_to_trash)
@@ -148,6 +154,45 @@ class SettingsPanel(QWidget):
         )
         layout.addRow(save_json)
 
+        # Ignore other filesystems
+        ignore_fs = QCheckBox(tr("settings-ignore-other-fs"))
+        ignore_fs.setChecked(self._settings.ignore_other_filesystems)
+        ignore_fs.setToolTip(tr("settings-ignore-other-fs-tooltip"))
+        ignore_fs.toggled.connect(lambda v: setattr(self._settings, 'ignore_other_filesystems', v))
+        layout.addRow(ignore_fs)
+
+        # Application scale
+        self._scale_spin = QDoubleSpinBox()
+        self._scale_spin.setRange(0.5, 3.0)
+        self._scale_spin.setSingleStep(0.1)
+        self._scale_spin.setValue(self._settings.app_scale)
+        self._scale_spin.valueChanged.connect(lambda v: setattr(self._settings, 'app_scale', v))
+        layout.addRow(tr("settings-app-scale"), self._scale_spin)
+
+        # Show only icons
+        icons_only = QCheckBox(tr("settings-show-only-icons"))
+        icons_only.setChecked(self._settings.show_only_icons)
+        icons_only.toggled.connect(lambda v: setattr(self._settings, 'show_only_icons', v))
+        layout.addRow(icons_only)
+
+        # Save window geometry
+        save_geom = QCheckBox(tr("settings-save-window-geometry"))
+        save_geom.setChecked(self._settings.save_window_geometry)
+        save_geom.toggled.connect(lambda v: setattr(self._settings, 'save_window_geometry', v))
+        layout.addRow(save_geom)
+
+        # Notify on completion
+        notify = QCheckBox(tr("settings-notify-on-completion"))
+        notify.setChecked(self._settings.notify_on_completion)
+        notify.toggled.connect(lambda v: setattr(self._settings, 'notify_on_completion', v))
+        layout.addRow(notify)
+
+        # Play sound on completion
+        sound = QCheckBox(tr("settings-play-sound-on-completion"))
+        sound.setChecked(self._settings.play_sound_on_completion)
+        sound.toggled.connect(lambda v: setattr(self._settings, 'play_sound_on_completion', v))
+        layout.addRow(sound)
+
         scroll.setWidget(widget)
         return scroll
 
@@ -168,6 +213,12 @@ class SettingsPanel(QWidget):
         add_inc = QPushButton(tr("settings-add"))
         add_inc.clicked.connect(self._add_included)
         inc_btns.addWidget(add_inc)
+        add_file_inc = QPushButton(tr("settings-add-file"))
+        add_file_inc.clicked.connect(self._add_included_file)
+        inc_btns.addWidget(add_file_inc)
+        manual_inc = QPushButton(tr("settings-manual-entry"))
+        manual_inc.clicked.connect(self._manual_add_included)
+        inc_btns.addWidget(manual_inc)
         rem_inc = QPushButton(tr("settings-remove"))
         rem_inc.clicked.connect(self._remove_included)
         inc_btns.addWidget(rem_inc)
@@ -188,6 +239,9 @@ class SettingsPanel(QWidget):
         add_exc = QPushButton(tr("settings-add"))
         add_exc.clicked.connect(self._add_excluded)
         exc_btns.addWidget(add_exc)
+        add_file_exc = QPushButton(tr("settings-add-file"))
+        add_file_exc.clicked.connect(self._add_excluded_file)
+        exc_btns.addWidget(add_file_exc)
         rem_exc = QPushButton(tr("settings-remove"))
         rem_exc.clicked.connect(self._remove_excluded)
         exc_btns.addWidget(rem_exc)
@@ -300,3 +354,50 @@ class SettingsPanel(QWidget):
             self._exc_list.takeItem(row)
             self._settings.excluded_paths.pop(row)
             self.settings_changed.emit()
+
+    def _add_included_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, tr("settings-select-file-include"))
+        if path and path not in self._settings.included_paths:
+            self._settings.included_paths.append(path)
+            self._inc_list.addItem(path)
+            self.settings_changed.emit()
+
+    def _add_excluded_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, tr("settings-select-file-exclude"))
+        if path and path not in self._settings.excluded_paths:
+            self._settings.excluded_paths.append(path)
+            self._exc_list.addItem(path)
+            self.settings_changed.emit()
+
+    def _manual_add_included(self):
+        from PySide6.QtWidgets import QInputDialog
+        path, ok = QInputDialog.getText(self, tr("settings-manual-entry"), tr("settings-manual-entry-prompt"))
+        if ok and path.strip() and path.strip() not in self._settings.included_paths:
+            self._settings.included_paths.append(path.strip())
+            self._inc_list.addItem(path.strip())
+            self.settings_changed.emit()
+
+    def _clean_cache(self):
+        """Delete the czkawka cache directory."""
+        import shutil
+        from pathlib import Path
+        from PySide6.QtWidgets import QMessageBox
+
+        # czkawka_cli uses ProjectDirs with qualifier "Czkawka"
+        # On Linux: ~/.cache/Czkawka/
+        cache_dir = Path.home() / ".cache" / "Czkawka"
+        if not cache_dir.exists():
+            QMessageBox.information(self, tr("settings-clean-cache"), tr("settings-cache-empty"))
+            return
+
+        reply = QMessageBox.question(
+            self, tr("settings-clean-cache"),
+            tr("settings-clean-cache-confirm", path=str(cache_dir)),
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            try:
+                shutil.rmtree(cache_dir)
+                QMessageBox.information(self, tr("settings-clean-cache"), tr("settings-cache-cleaned"))
+            except OSError as e:
+                QMessageBox.warning(self, tr("settings-clean-cache"), str(e))

@@ -72,6 +72,9 @@ class ToolSettingsPanel(QWidget):
 
     def set_use_reference(self, enabled: bool):
         self._dup_reference.setChecked(enabled)
+        self._img_reference.setChecked(enabled)
+        self._vid_reference.setChecked(enabled)
+        self._music_reference.setChecked(enabled)
 
     def _create_duplicate_panel(self) -> QWidget:
         panel = QWidget()
@@ -122,6 +125,13 @@ class ToolSettingsPanel(QWidget):
         self._dup_reference.setToolTip(tr("subsettings-use-reference-tooltip"))
         self._dup_reference.toggled.connect(self.reference_toggled.emit)
         layout.addRow(self._dup_reference)
+
+        # No self-compare
+        self._dup_no_self = QCheckBox(tr("subsettings-no-self-compare"))
+        self._dup_no_self.setChecked(self._ts.dup_no_self_compare)
+        self._dup_no_self.setToolTip(tr("subsettings-no-self-compare-tooltip"))
+        self._dup_no_self.toggled.connect(lambda v: setattr(self._ts, 'dup_no_self_compare', v))
+        layout.addRow(self._dup_no_self)
 
         return panel
 
@@ -200,6 +210,13 @@ class ToolSettingsPanel(QWidget):
         diff_layout.addWidget(self._img_diff_label)
         layout.addRow(tr("subsettings-max-difference"), diff_layout)
 
+        # Use reference folders
+        self._img_reference = QCheckBox(tr("subsettings-use-reference"))
+        self._img_reference.setChecked(False)
+        self._img_reference.setToolTip(tr("subsettings-use-reference-tooltip"))
+        self._img_reference.toggled.connect(self.reference_toggled.emit)
+        layout.addRow(self._img_reference)
+
         return panel
 
     def _on_img_diff_changed(self, value):
@@ -273,6 +290,13 @@ class ToolSettingsPanel(QWidget):
         dur_layout.addWidget(self._vid_dur_label)
         layout.addRow(tr("subsettings-hash-duration"), dur_layout)
 
+        # Use reference folders
+        self._vid_reference = QCheckBox(tr("subsettings-use-reference"))
+        self._vid_reference.setChecked(False)
+        self._vid_reference.setToolTip(tr("subsettings-use-reference-tooltip"))
+        self._vid_reference.toggled.connect(self.reference_toggled.emit)
+        layout.addRow(self._vid_reference)
+
         return panel
 
     def _create_similar_music_panel(self) -> QWidget:
@@ -307,6 +331,31 @@ class ToolSettingsPanel(QWidget):
             cb.toggled.connect(lambda v, a=attr: setattr(self._ts, a, v))
             tags_layout.addWidget(cb)
 
+        # Fuzzy tag comparison
+        self._music_fuzzy = QCheckBox(tr("subsettings-fuzzy-tag-comparison"))
+        self._music_fuzzy.setChecked(self._ts.music_fuzzy_tag_comparison)
+        self._music_fuzzy.toggled.connect(lambda v: setattr(self._ts, 'music_fuzzy_tag_comparison', v))
+        tags_layout.addWidget(self._music_fuzzy)
+
+        # Tag similarity threshold
+        tag_thresh_layout = QHBoxLayout()
+        self._music_tag_thresh_slider = QSlider(Qt.Horizontal)
+        self._music_tag_thresh_slider.setRange(50, 100)
+        self._music_tag_thresh_slider.setValue(int(self._ts.music_tag_similarity_threshold * 100))
+        self._music_tag_thresh_label = QLabel(f"{self._ts.music_tag_similarity_threshold:.0%}")
+        self._music_tag_thresh_slider.valueChanged.connect(lambda v: (
+            setattr(self._ts, 'music_tag_similarity_threshold', v / 100.0),
+            self._music_tag_thresh_label.setText(f"{v}%"),
+            self.settings_changed.emit(),
+        ))
+        tag_thresh_layout.addWidget(self._music_tag_thresh_slider)
+        tag_thresh_layout.addWidget(self._music_tag_thresh_label)
+        tag_thresh_widget = QWidget()
+        tag_thresh_widget_layout = QFormLayout(tag_thresh_widget)
+        tag_thresh_widget_layout.setContentsMargins(0, 0, 0, 0)
+        tag_thresh_widget_layout.addRow(tr("subsettings-tag-similarity-threshold"), tag_thresh_layout)
+        tags_layout.addWidget(tag_thresh_widget)
+
         layout.addRow(self._tags_group)
 
         # Fingerprint group
@@ -334,8 +383,30 @@ class ToolSettingsPanel(QWidget):
         diff_layout.addWidget(self._music_diff_label)
         fp_layout.addRow(tr("subsettings-max-difference"), diff_layout)
 
+        # Min segment duration
+        seg_layout = QHBoxLayout()
+        self._music_seg_slider = QSlider(Qt.Horizontal)
+        self._music_seg_slider.setRange(1, 360)
+        self._music_seg_slider.setValue(int(self._ts.music_min_segment_duration))
+        self._music_seg_label = QLabel(f"{self._ts.music_min_segment_duration:.0f}s")
+        self._music_seg_slider.valueChanged.connect(lambda v: (
+            setattr(self._ts, 'music_min_segment_duration', float(v)),
+            self._music_seg_label.setText(f"{v}s"),
+            self.settings_changed.emit(),
+        ))
+        seg_layout.addWidget(self._music_seg_slider)
+        seg_layout.addWidget(self._music_seg_label)
+        fp_layout.addRow(tr("subsettings-min-segment-duration"), seg_layout)
+
         layout.addRow(self._fp_group)
         self._on_music_method_changed(self._music_method.currentIndex())
+
+        # Use reference folders
+        self._music_reference = QCheckBox(tr("subsettings-use-reference"))
+        self._music_reference.setChecked(False)
+        self._music_reference.setToolTip(tr("subsettings-use-reference-tooltip"))
+        self._music_reference.toggled.connect(self.reference_toggled.emit)
+        layout.addRow(self._music_reference)
 
         return panel
 
@@ -495,6 +566,32 @@ class ToolSettingsPanel(QWidget):
         )
         crop_layout.addRow(tr("subsettings-min-crop-size"), self._vo_min_crop)
 
+        # Reencode during crop
+        self._vo_crop_reencode = QCheckBox(tr("subsettings-reencode-crop"))
+        self._vo_crop_reencode.setChecked(self._ts.video_crop_reencode)
+        self._vo_crop_reencode.toggled.connect(
+            lambda v: setattr(self._ts, 'video_crop_reencode', v)
+        )
+        crop_layout.addRow(self._vo_crop_reencode)
+
+        self._vo_crop_codec = QComboBox()
+        self._vo_crop_codec.addItems(["H264", "H265", "AV1", "VP9"])
+        codecs = [VideoCodec.H264, VideoCodec.H265, VideoCodec.AV1, VideoCodec.VP9]
+        crop_codec_idx = codecs.index(self._ts.video_crop_codec) if self._ts.video_crop_codec in codecs else 1
+        self._vo_crop_codec.setCurrentIndex(crop_codec_idx)
+        self._vo_crop_codec.currentIndexChanged.connect(
+            lambda idx: setattr(self._ts, 'video_crop_codec', codecs[idx])
+        )
+        crop_layout.addRow(tr("subsettings-target-codec"), self._vo_crop_codec)
+
+        self._vo_crop_quality = QSpinBox()
+        self._vo_crop_quality.setRange(0, 51)
+        self._vo_crop_quality.setValue(self._ts.video_crop_quality)
+        self._vo_crop_quality.valueChanged.connect(
+            lambda v: setattr(self._ts, 'video_crop_quality', v)
+        )
+        crop_layout.addRow(tr("subsettings-quality"), self._vo_crop_quality)
+
         layout.addRow(self._crop_group)
 
         # Transcode settings
@@ -533,6 +630,73 @@ class ToolSettingsPanel(QWidget):
         tc_layout.addRow(self._vo_fail_bigger)
 
         layout.addRow(self._transcode_group)
+
+        # Shared video settings
+        shared_group = QGroupBox(tr("subsettings-video-general"))
+        shared_layout = QFormLayout(shared_group)
+
+        self._vo_overwrite = QCheckBox(tr("subsettings-overwrite-original"))
+        self._vo_overwrite.setChecked(self._ts.video_overwrite)
+        self._vo_overwrite.toggled.connect(
+            lambda v: setattr(self._ts, 'video_overwrite', v)
+        )
+        shared_layout.addRow(self._vo_overwrite)
+
+        self._vo_limit_size = QCheckBox(tr("subsettings-limit-video-size"))
+        self._vo_limit_size.setChecked(self._ts.video_limit_size)
+        self._vo_limit_size.toggled.connect(
+            lambda v: setattr(self._ts, 'video_limit_size', v)
+        )
+        shared_layout.addRow(self._vo_limit_size)
+
+        self._vo_max_width = QSpinBox()
+        self._vo_max_width.setRange(1, 7680)
+        self._vo_max_width.setValue(self._ts.video_max_width)
+        self._vo_max_width.valueChanged.connect(
+            lambda v: setattr(self._ts, 'video_max_width', v)
+        )
+        shared_layout.addRow(tr("subsettings-max-width"), self._vo_max_width)
+
+        self._vo_max_height = QSpinBox()
+        self._vo_max_height.setRange(1, 4320)
+        self._vo_max_height.setValue(self._ts.video_max_height)
+        self._vo_max_height.valueChanged.connect(
+            lambda v: setattr(self._ts, 'video_max_height', v)
+        )
+        shared_layout.addRow(tr("subsettings-max-height"), self._vo_max_height)
+
+        # Thumbnail generation
+        self._vo_thumbnail = QCheckBox(tr("subsettings-generate-thumbnails"))
+        self._vo_thumbnail.setChecked(self._ts.video_thumbnail)
+        self._vo_thumbnail.toggled.connect(
+            lambda v: setattr(self._ts, 'video_thumbnail', v)
+        )
+        shared_layout.addRow(self._vo_thumbnail)
+
+        self._vo_thumb_pct = QSpinBox()
+        self._vo_thumb_pct.setRange(1, 99)
+        self._vo_thumb_pct.setValue(self._ts.video_thumbnail_percentage)
+        self._vo_thumb_pct.valueChanged.connect(
+            lambda v: setattr(self._ts, 'video_thumbnail_percentage', v)
+        )
+        shared_layout.addRow(tr("subsettings-thumbnail-position"), self._vo_thumb_pct)
+
+        self._vo_thumb_grid = QCheckBox(tr("subsettings-thumbnail-grid"))
+        self._vo_thumb_grid.setChecked(self._ts.video_thumbnail_grid)
+        self._vo_thumb_grid.toggled.connect(
+            lambda v: setattr(self._ts, 'video_thumbnail_grid', v)
+        )
+        shared_layout.addRow(self._vo_thumb_grid)
+
+        self._vo_thumb_tiles = QSpinBox()
+        self._vo_thumb_tiles.setRange(2, 6)
+        self._vo_thumb_tiles.setValue(self._ts.video_thumbnail_grid_tiles)
+        self._vo_thumb_tiles.valueChanged.connect(
+            lambda v: setattr(self._ts, 'video_thumbnail_grid_tiles', v)
+        )
+        shared_layout.addRow(tr("subsettings-thumbnail-tiles"), self._vo_thumb_tiles)
+
+        layout.addRow(shared_group)
 
         self._on_vo_mode_changed(self._vo_mode.currentIndex())
         return panel

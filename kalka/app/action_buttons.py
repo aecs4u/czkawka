@@ -40,8 +40,10 @@ def _themed_icon(key: str) -> QIcon:
 
 def _make_btn(key: str, label_key: str, signal, layout) -> QPushButton:
     """Create and register an icon button with KDE HIG sizing."""
-    btn = QPushButton(_themed_icon(key), " " + tr(label_key))
+    label = tr(label_key)
+    btn = QPushButton(_themed_icon(key), " " + label)
     btn.setIconSize(ICON_SMALL_MEDIUM)
+    btn.setProperty("_label_text", label)
     btn.clicked.connect(signal.emit)
     layout.addWidget(btn)
     return btn
@@ -207,3 +209,14 @@ class ActionButtons(QWidget):
                 self._profiles_menu.addAction(
                     name, lambda n=name: self.load_profile_clicked.emit(n)
                 )
+
+    def set_icons_only(self, icons_only: bool):
+        """Toggle between icon-only and icon+text mode for all action buttons."""
+        for btn in (
+            self._scan_btn, self._stop_btn, self._select_btn, self._delete_btn,
+            self._move_btn, self._save_btn, self._load_btn, self._sort_btn,
+            self._hardlink_btn, self._symlink_btn, self._rename_btn,
+            self._clean_exif_btn, self._optimize_btn,
+        ):
+            label = btn.property("_label_text") or ""
+            btn.setText("" if icons_only else " " + label)

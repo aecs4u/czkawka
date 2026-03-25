@@ -227,6 +227,8 @@ class ScanWorker(QObject):
             cmd.extend(["-T", str(s.thread_number)])
         if s.use_reference_folders and s.reference_paths:
             cmd.extend(["-r", ",".join(s.reference_paths)])
+        if s.ignore_other_filesystems:
+            cmd.append("-X")
 
         # Tool-specific args
         if self.tab == ActiveTab.DUPLICATE_FILES:
@@ -244,6 +246,8 @@ class ScanWorker(QObject):
                 cmd.append("-u")
             if ts.dup_check_method == CheckingMethod.FUZZY_NAME:
                 cmd.extend(["--name-similarity-threshold", str(ts.dup_name_similarity_threshold)])
+            if ts.dup_no_self_compare:
+                cmd.append("--no-self-compare")
 
         elif self.tab == ActiveTab.SIMILAR_IMAGES:
             cmd.extend(["-g", ts.img_hash_alg.value])
@@ -277,6 +281,12 @@ class ScanWorker(QObject):
                     cmd.append("-a")
             else:
                 cmd.extend(["-Y", str(ts.music_max_difference)])
+            if ts.music_min_segment_duration and ts.music_search_method == MusicSearchMethod.CONTENT:
+                cmd.extend(["-l", str(ts.music_min_segment_duration)])
+            if ts.music_fuzzy_tag_comparison:
+                cmd.append("--fuzzy-tag-comparison")
+            if ts.music_fuzzy_tag_comparison and ts.music_tag_similarity_threshold:
+                cmd.extend(["--tag-similarity-threshold", str(ts.music_tag_similarity_threshold)])
 
         elif self.tab == ActiveTab.BIG_FILES:
             cmd.extend(["-n", str(ts.big_files_number)])
@@ -314,6 +324,17 @@ class ScanWorker(QObject):
                 cmd.extend(["-b", str(ts.video_black_bar_percentage)])
                 cmd.extend(["-s", str(ts.video_max_samples)])
                 cmd.extend(["-z", str(ts.video_min_crop_size)])
+                if ts.video_overwrite:
+                    cmd.append("--overwrite-original")
+                if ts.video_crop_reencode:
+                    cmd.extend(["--target-codec", ts.video_crop_codec.value])
+                    cmd.extend(["--quality", str(ts.video_crop_quality)])
+                if ts.video_thumbnail:
+                    cmd.append("-t")
+                    cmd.extend(["-V", str(ts.video_thumbnail_percentage)])
+                if ts.video_thumbnail_grid:
+                    cmd.append("-g")
+                    cmd.extend(["-Z", str(ts.video_thumbnail_grid_tiles)])
             else:
                 if ts.video_excluded_codecs:
                     cmd.extend(["-c", ts.video_excluded_codecs])
@@ -321,6 +342,18 @@ class ScanWorker(QObject):
                 cmd.extend(["--quality", str(ts.video_quality)])
                 if ts.video_fail_if_bigger:
                     cmd.append("--fail-if-not-smaller")
+                if ts.video_overwrite:
+                    cmd.append("--overwrite-original")
+                if ts.video_limit_size:
+                    cmd.append("--limit-video-size")
+                    cmd.extend(["--max-width", str(ts.video_max_width)])
+                    cmd.extend(["--max-height", str(ts.video_max_height)])
+                if ts.video_thumbnail:
+                    cmd.append("-t")
+                    cmd.extend(["-V", str(ts.video_thumbnail_percentage)])
+                if ts.video_thumbnail_grid:
+                    cmd.append("-g")
+                    cmd.extend(["-Z", str(ts.video_thumbnail_grid_tiles)])
 
         elif self.tab == ActiveTab.SIMILAR_DOCUMENTS:
             cmd.extend(["--similarity-threshold", str(ts.doc_similarity_threshold)])

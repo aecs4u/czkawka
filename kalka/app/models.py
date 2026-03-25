@@ -227,6 +227,7 @@ class ToolSettings:
     dup_min_cache_size: str = "257144"
     dup_use_prehash: bool = True
     dup_min_prehash_cache_size: str = "257144"
+    dup_no_self_compare: bool = False  # don't compare files within same directory
 
     # Similar Images
     img_hash_size: int = 16  # 8, 16, 32, 64
@@ -254,6 +255,8 @@ class ToolSettings:
     music_compare_fingerprints_similar_titles: bool = False
     music_max_difference: float = 2.0
     music_min_segment_duration: float = 10.0
+    music_fuzzy_tag_comparison: bool = False  # use Jaro-Winkler for tag matching
+    music_tag_similarity_threshold: float = 0.85  # threshold for fuzzy tag matching
 
     # Big Files
     big_files_mode: str = "biggest"  # biggest or smallest
@@ -296,6 +299,14 @@ class ToolSettings:
     video_overwrite: bool = False
     video_max_width: int = 1920
     video_max_height: int = 1080
+    video_limit_size: bool = False  # enable max width/height limiting
+    video_crop_reencode: bool = False  # reencode during crop
+    video_crop_codec: VideoCodec = VideoCodec.H265  # codec for crop reencode
+    video_crop_quality: int = 23  # quality for crop reencode
+    video_thumbnail: bool = False  # generate thumbnails
+    video_thumbnail_percentage: int = 10  # thumbnail position (1-99%)
+    video_thumbnail_grid: bool = False  # generate grid of thumbnails
+    video_thumbnail_grid_tiles: int = 3  # tiles per side (2-6)
 
 
 @dataclass
@@ -321,3 +332,13 @@ class AppSettings:
     czkawka_cli_path: str = "czkawka_cli"  # path to CLI binary
     low_priority_scan: bool = False  # run scans with idle CPU/IO priority
     language: str = ""  # empty = auto-detect from system locale
+    ignore_other_filesystems: bool = False  # Unix only: exclude files on different filesystems
+    app_scale: float = 1.0  # UI scale factor (0.5-3.0)
+    show_only_icons: bool = False  # compact mode: buttons show icons only
+    save_window_geometry: bool = True  # persist window size/position
+    window_width: int = 1200
+    window_height: int = 800
+    window_x: int = -1  # -1 = default position
+    window_y: int = -1
+    notify_on_completion: bool = False  # desktop notification on scan finish
+    play_sound_on_completion: bool = False  # audio beep on scan finish

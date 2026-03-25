@@ -42,6 +42,21 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._connect_signals()
         self._apply_theme()
+        self._update_reference_visibility()
+
+        # Restore saved window geometry
+        if self._state.settings.save_window_geometry:
+            s = self._state.settings
+            if s.window_x >= 0 and s.window_y >= 0:
+                self.move(s.window_x, s.window_y)
+            if s.window_width > 0 and s.window_height > 0:
+                self.resize(s.window_width, s.window_height)
+
+        # Apply application scale
+        if self._state.settings.app_scale != 1.0:
+            from PySide6.QtCore import QCoreApplication
+            import os
+            os.environ["QT_SCALE_FACTOR"] = str(self._state.settings.app_scale)
 
         # Live theme switching: re-derive palette colors when system theme changes
         QApplication.instance().paletteChanged.connect(
@@ -182,6 +197,7 @@ class MainWindow(QMainWindow):
             lambda: self._settings_panel.setVisible(False)
         )
         self._settings_panel.settings_changed.connect(self._on_settings_changed)
+        self._settings_panel.settings_changed.connect(self._apply_icons_mode)
 
         # Bottom panel
         self._bottom_panel.directories_changed.connect(self._on_settings_changed)
@@ -191,6 +207,7 @@ class MainWindow(QMainWindow):
         self._results_view.set_active_tab(tab)
         self._action_buttons.set_active_tab(tab)
         self._tool_settings.set_active_tab(tab)
+        self._update_reference_visibility()
 
         # Show/hide preview for image-related tabs
         show_preview = (
@@ -209,6 +226,13 @@ class MainWindow(QMainWindow):
             self._action_buttons.set_has_results(False)
 
         self._status_label.setText(tr("status-tab", tab_name=tab.name.replace('_', ' ').title()))
+
+    def _update_reference_visibility(self):
+        """Show reference checkboxes on included dirs when reference mode is active and tab supports it."""
+        tab = self._state.active_tab
+        tab_supports = tab.name in self._bottom_panel.REFERENCE_TABS
+        visible = self._state.settings.use_reference_folders and tab_supports
+        self._bottom_panel.set_reference_visible(visible)
 
     def _start_scan(self):
         tab = self._state.active_tab
@@ -251,6 +275,12 @@ class MainWindow(QMainWindow):
         count = sum(1 for r in results if not r.header_row)
         self._status_label.setText(tr("status-scan-complete", count=count))
 
+        # Notifications
+        if self._state.settings.notify_on_completion:
+            self._send_notification(count)
+        if self._state.settings.play_sound_on_completion:
+            self._play_completion_sound()
+
     def _on_scan_progress(self, progress):
         self._progress.update_progress(progress)
 
@@ -286,6 +316,11 @@ class MainWindow(QMainWindow):
 
     def _on_reference_toggled(self, enabled: bool):
         self._state.settings.use_reference_folders = enabled
+        # Sync all reference checkboxes across tool panels
+        self._tool_settings.blockSignals(True)
+        self._tool_settings.set_use_reference(enabled)
+        self._tool_settings.blockSignals(False)
+        self._update_reference_visibility()
 
     def _show_settings(self):
         self._settings_panel.setVisible(True)
@@ -643,7 +678,45 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Save settings on close."""
+        if self._state.settings.save_window_geometry:
+            pos = self.pos()
+            size = self.size()
+            self._state.settings.window_x = pos.x()
+            self._state.settings.window_y = pos.y()
+            self._state.settings.window_width = size.width()
+            self._state.settings.window_height = size.height()
         self._state.save_settings()
         if self._state.scanning:
             self._scan_runner.stop_scan()
         super().closeEvent(event)
+
+    def _apply_icons_mode(self):
+        """Toggle icon-only mode on action buttons."""
+        icons_only = self._state.settings.show_only_icons
+        self._action_buttons.set_icons_only(icons_only)
+
+    def _send_notification(self, count: int):
+        """Send a desktop notification on scan completion."""
+        try:
+            from PySide6.QtWidgets import QSystemTrayIcon
+            if QSystemTrayIcon.isSystemTrayAvailable():
+                tray = QSystemTrayIcon(self.windowIcon(), self)
+                tray.show()
+                tray.showMessage(
+                    "Kalka - Scan Complete",
+                    f"Found {count} entries",
+                    QSystemTrayIcon.Information,
+                    3000,
+                )
+                # Clean up tray icon after message
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(4000, tray.hide)
+        except Exception:
+            pass
+
+    def _play_completion_sound(self):
+        """Play a short beep/sound on scan completion."""
+        try:
+            QApplication.beep()
+        except Exception:
+            pass

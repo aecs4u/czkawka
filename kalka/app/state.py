@@ -117,6 +117,16 @@ class AppState(QObject):
             "show_image_preview": self.settings.show_image_preview,
             "czkawka_cli_path": self.settings.czkawka_cli_path,
             "language": self.settings.language,
+            "ignore_other_filesystems": self.settings.ignore_other_filesystems,
+            "app_scale": self.settings.app_scale,
+            "show_only_icons": self.settings.show_only_icons,
+            "save_window_geometry": self.settings.save_window_geometry,
+            "window_width": self.settings.window_width,
+            "window_height": self.settings.window_height,
+            "window_x": self.settings.window_x,
+            "window_y": self.settings.window_y,
+            "notify_on_completion": self.settings.notify_on_completion,
+            "play_sound_on_completion": self.settings.play_sound_on_completion,
         }
         try:
             config_file.write_text(json.dumps(data, indent=2))
@@ -149,6 +159,16 @@ class AppState(QObject):
                 s.show_image_preview = data.get("show_image_preview", s.show_image_preview)
                 s.czkawka_cli_path = data.get("czkawka_cli_path", s.czkawka_cli_path)
                 s.language = data.get("language", s.language)
+                s.ignore_other_filesystems = data.get("ignore_other_filesystems", s.ignore_other_filesystems)
+                s.app_scale = data.get("app_scale", s.app_scale)
+                s.show_only_icons = data.get("show_only_icons", s.show_only_icons)
+                s.save_window_geometry = data.get("save_window_geometry", s.save_window_geometry)
+                s.window_width = data.get("window_width", s.window_width)
+                s.window_height = data.get("window_height", s.window_height)
+                s.window_x = data.get("window_x", s.window_x)
+                s.window_y = data.get("window_y", s.window_y)
+                s.notify_on_completion = data.get("notify_on_completion", s.notify_on_completion)
+                s.play_sound_on_completion = data.get("play_sound_on_completion", s.play_sound_on_completion)
                 log.debug("settings_loaded", path=str(config_file))
             except (json.JSONDecodeError, OSError) as e:
                 log.warning("settings_load_failed", path=str(config_file), error=str(e))

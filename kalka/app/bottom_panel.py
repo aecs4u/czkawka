@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QPushButton, QFileDialog, QTextEdit, QStackedWidget,
     QSizePolicy
 )
@@ -52,9 +52,14 @@ class BottomPanel(QWidget):
     """Bottom panel showing directories or error messages."""
     directories_changed = Signal()
 
+    # Tabs that support reference folders (must match czkawka_core)
+    REFERENCE_TABS = {"DUPLICATE_FILES", "SIMILAR_IMAGES", "SIMILAR_VIDEOS", "SIMILAR_MUSIC"}
+
     def __init__(self, settings: AppSettings, parent=None):
         super().__init__(parent)
         self._settings = settings
+        self._reference_mode = False
+        self._reference_visible = False
         self.setMaximumHeight(200)
         self._setup_ui()
 
@@ -78,8 +83,9 @@ class BottomPanel(QWidget):
         self._inc_list = _DroppableListWidget()
         self._inc_list.setMaximumHeight(120)
         self._inc_list.items_dropped.connect(self._on_included_dropped)
+        self._inc_list.itemChanged.connect(self._on_reference_checkbox_changed)
         for path in self._settings.included_paths:
-            self._inc_list.addItem(path)
+            self._add_included_item(path)
         inc_layout.addWidget(self._inc_list)
 
         inc_btns = QHBoxLayout()
@@ -148,18 +154,32 @@ class BottomPanel(QWidget):
     def append_text(self, text: str):
         self._text_area.append(text)
 
+    def _add_included_item(self, path: str):
+        """Add an included directory item, with optional reference checkbox."""
+        item = QListWidgetItem(path)
+        is_ref = path in self._settings.reference_paths
+        if self._reference_visible:
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if is_ref else Qt.Unchecked)
+            item.setToolTip(tr("bottom-reference-tooltip"))
+        self._inc_list.addItem(item)
+
     def _add_included(self):
         path = QFileDialog.getExistingDirectory(self, tr("settings-select-dir-include"))
         if path and path not in self._settings.included_paths:
             self._settings.included_paths.append(path)
-            self._inc_list.addItem(path)
+            self._add_included_item(path)
             self.directories_changed.emit()
 
     def _remove_included(self):
         row = self._inc_list.currentRow()
         if row >= 0:
+            path = self._inc_list.item(row).text()
             self._inc_list.takeItem(row)
             self._settings.included_paths.pop(row)
+            # Also remove from reference paths if present
+            if path in self._settings.reference_paths:
+                self._settings.reference_paths.remove(path)
             self.directories_changed.emit()
 
     def _add_excluded(self):
@@ -180,7 +200,7 @@ class BottomPanel(QWidget):
         for path in paths:
             if path not in self._settings.included_paths:
                 self._settings.included_paths.append(path)
-                self._inc_list.addItem(path)
+                self._add_included_item(path)
         self.directories_changed.emit()
 
     def _on_excluded_dropped(self, paths: list):
@@ -190,10 +210,33 @@ class BottomPanel(QWidget):
                 self._exc_list.addItem(path)
         self.directories_changed.emit()
 
-    def refresh_lists(self):
+    def _on_reference_checkbox_changed(self, item: QListWidgetItem):
+        """Update reference_paths when a checkbox is toggled."""
+        path = item.text()
+        is_checked = item.checkState() == Qt.Checked
+        if is_checked and path not in self._settings.reference_paths:
+            self._settings.reference_paths.append(path)
+        elif not is_checked and path in self._settings.reference_paths:
+            self._settings.reference_paths.remove(path)
+        self.directories_changed.emit()
+
+    def set_reference_visible(self, visible: bool):
+        """Show or hide reference checkboxes on included directory items."""
+        if visible == self._reference_visible:
+            return
+        self._reference_visible = visible
+        self._rebuild_included_items()
+
+    def _rebuild_included_items(self):
+        """Rebuild included list items with or without checkboxes."""
+        self._inc_list.blockSignals(True)
         self._inc_list.clear()
         for path in self._settings.included_paths:
-            self._inc_list.addItem(path)
+            self._add_included_item(path)
+        self._inc_list.blockSignals(False)
+
+    def refresh_lists(self):
+        self._rebuild_included_items()
         self._exc_list.clear()
         for path in self._settings.excluded_paths:
             self._exc_list.addItem(path)

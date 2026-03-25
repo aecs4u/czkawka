@@ -141,6 +141,18 @@ settings-save-as-json = Save results as JSON (instead of text)
 settings-select-cli-binary = Select czkawka_cli binary
 settings-low-priority = Low priority scanning (nice/ionice)
 settings-low-priority-tooltip = Run scans with idle CPU and I/O priority so they don't slow down other applications
+settings-ignore-other-fs = Ignore other filesystems (Unix only)
+settings-ignore-other-fs-tooltip = Skip files on different filesystems than the included directories
+settings-app-scale = UI Scale:
+settings-show-only-icons = Show only icons on buttons
+settings-save-window-geometry = Remember window size and position
+settings-notify-on-completion = Show notification when scan completes
+settings-play-sound-on-completion = Play sound when scan completes
+settings-clean-cache = Clean Cache
+settings-clean-cache-tooltip = Delete all cached scan data to free disk space
+settings-cache-empty = Cache directory does not exist or is already empty.
+settings-cache-cleaned = Cache cleaned successfully.
+settings-clean-cache-confirm = Delete all cache data in { $path }?
 
 # Directories settings
 settings-included-dirs = Included Directories
@@ -149,6 +161,11 @@ settings-add = Add
 settings-remove = Remove
 settings-select-dir-include = Select Directory to Include
 settings-select-dir-exclude = Select Directory to Exclude
+settings-select-file-include = Select File to Include
+settings-select-file-exclude = Select File to Exclude
+settings-add-file = Add File
+settings-manual-entry = Manual Entry
+settings-manual-entry-prompt = Enter a path (file or directory):
 
 # Filters settings
 settings-excluded-items = Excluded Items:
@@ -278,6 +295,7 @@ context-deselect = Deselect
 # ── Bottom panel ─────────────────────────────────────────
 bottom-included-dirs = Included Directories:
 bottom-excluded-dirs = Excluded Directories:
+bottom-reference-tooltip = Check to mark as reference folder (files here are used for comparison but won't appear in results)
 
 # ── Delete dialog ────────────────────────────────────────
 delete-dialog-title = Delete Files
@@ -401,6 +419,27 @@ subsettings-vo-crop = Crop
 subsettings-vo-transcode = Transcode
 subsettings-crop-black-bars = Black Bars
 subsettings-crop-static-content = Static Content
+
+# Duplicates - additional
+subsettings-no-self-compare = Don't compare files within same directory
+subsettings-no-self-compare-tooltip = Skip comparing files that are in the same included directory
+
+# Similar Music - additional
+subsettings-fuzzy-tag-comparison = Fuzzy tag comparison (Jaro-Winkler)
+subsettings-tag-similarity-threshold = Tag similarity:
+subsettings-min-segment-duration = Min segment duration (s):
+
+# Video Optimizer - additional
+subsettings-reencode-crop = Re-encode during crop
+subsettings-overwrite-original = Overwrite original files
+subsettings-limit-video-size = Limit video dimensions
+subsettings-max-width = Max Width (px):
+subsettings-max-height = Max Height (px):
+subsettings-generate-thumbnails = Generate thumbnails
+subsettings-thumbnail-position = Thumbnail position (%):
+subsettings-thumbnail-grid = Generate thumbnail grid
+subsettings-thumbnail-tiles = Tiles per side:
+subsettings-video-general = General Video Settings
 
 # Similar Documents
 subsettings-doc-similarity = Similarity Threshold:
