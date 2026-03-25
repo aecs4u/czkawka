@@ -54,6 +54,7 @@ class ToolSettingsPanel(QWidget):
         self._panels[ActiveTab.BAD_NAMES] = self._create_bad_names_panel()
         self._panels[ActiveTab.EXIF_REMOVER] = self._create_exif_panel()
         self._panels[ActiveTab.VIDEO_OPTIMIZER] = self._create_video_optimizer_panel()
+        self._panels[ActiveTab.SIMILAR_DOCUMENTS] = self._create_similar_documents_panel()
 
         for panel in self._panels.values():
             self._container_layout.addWidget(panel)
@@ -530,4 +531,44 @@ class ToolSettingsPanel(QWidget):
         self._ts.video_opt_mode = mode
         self._crop_group.setVisible(idx == 0)
         self._transcode_group.setVisible(idx == 1)
+        self.settings_changed.emit()
+
+    def _create_similar_documents_panel(self) -> QWidget:
+        panel = QWidget()
+        layout = QFormLayout(panel)
+
+        # Similarity threshold slider
+        thresh_layout = QHBoxLayout()
+        self._doc_thresh_slider = QSlider(Qt.Horizontal)
+        self._doc_thresh_slider.setRange(0, 100)
+        self._doc_thresh_slider.setValue(int(self._ts.doc_similarity_threshold * 100))
+        self._doc_thresh_label = QLabel(f"{self._ts.doc_similarity_threshold:.0%}")
+        self._doc_thresh_slider.valueChanged.connect(self._on_doc_thresh_changed)
+        thresh_layout.addWidget(self._doc_thresh_slider)
+        thresh_layout.addWidget(self._doc_thresh_label)
+        layout.addRow(tr("subsettings-doc-similarity"), thresh_layout)
+
+        # Number of hashes
+        self._doc_hashes = QSpinBox()
+        self._doc_hashes.setRange(32, 512)
+        self._doc_hashes.setValue(self._ts.doc_num_hashes)
+        self._doc_hashes.valueChanged.connect(
+            lambda v: setattr(self._ts, 'doc_num_hashes', v)
+        )
+        layout.addRow(tr("subsettings-doc-num-hashes"), self._doc_hashes)
+
+        # Shingle size
+        self._doc_shingle = QSpinBox()
+        self._doc_shingle.setRange(1, 10)
+        self._doc_shingle.setValue(self._ts.doc_shingle_size)
+        self._doc_shingle.valueChanged.connect(
+            lambda v: setattr(self._ts, 'doc_shingle_size', v)
+        )
+        layout.addRow(tr("subsettings-doc-shingle-size"), self._doc_shingle)
+
+        return panel
+
+    def _on_doc_thresh_changed(self, value):
+        self._ts.doc_similarity_threshold = value / 100.0
+        self._doc_thresh_label.setText(f"{value}%")
         self.settings_changed.emit()

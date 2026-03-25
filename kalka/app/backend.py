@@ -10,10 +10,13 @@ from typing import Optional
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+from .logger import get_logger
 from .models import (
     ActiveTab, AppSettings, ToolSettings, ResultEntry, ScanProgress,
     TAB_TO_CLI_COMMAND, GROUPED_TABS, CheckingMethod, MusicSearchMethod,
 )
+
+log = get_logger("backend")
 
 
 class ScanWorker(QObject):
@@ -21,6 +24,7 @@ class ScanWorker(QObject):
     finished = Signal(object, list)  # (ActiveTab, results)
     progress = Signal(object)  # ScanProgress
     error = Signal(str)
+    diagnostics = Signal(list)  # list of non-JSON stderr lines
 
     def __init__(self, tab: ActiveTab, app_settings: AppSettings,
                  tool_settings: ToolSettings):
@@ -30,13 +34,20 @@ class ScanWorker(QObject):
         self.tool_settings = tool_settings
         self._process: Optional[subprocess.Popen] = None
         self._cancelled = False
+        self._stderr_lines: list[str] = []
 
     def run(self):
+        import time
         try:
             cmd = self._build_command()
             if not cmd:
+                log.warning("scan_no_command", tab=self.tab.name)
                 self.error.emit(f"No CLI command for tab {self.tab}")
                 return
+
+            log.info("scan_started", tab=self.tab.name,
+                     cli=self.app_settings.czkawka_cli_path,
+                     included_dirs=self.app_settings.included_paths)
 
             self.progress.emit(ScanProgress(
                 step_name="Collecting files...", current=0, total=0
@@ -45,6 +56,7 @@ class ScanWorker(QObject):
             with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
                 json_output_path = f.name
 
+            t0 = time.monotonic()
             try:
                 # Add JSON output flag (use long form to avoid conflict with -C in broken files)
                 cmd.extend(["--compact-file-to-save", json_output_path])
@@ -60,6 +72,8 @@ class ScanWorker(QObject):
                         prefix.extend(["nice", "-n", "19"])
                     cmd = prefix + cmd
 
+                log.debug("scan_exec", cmd=cmd)
+
                 self._process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.DEVNULL,
@@ -71,12 +85,18 @@ class ScanWorker(QObject):
                 self._monitor_process_json(json_output_path)
 
                 if self._cancelled:
+                    elapsed = time.monotonic() - t0
+                    log.info("scan_cancelled", tab=self.tab.name,
+                             elapsed_s=round(elapsed, 2))
                     return
 
                 # Check for CLI errors (exit code 11 = results found, not an error)
                 returncode = self._process.returncode
                 if returncode is not None and returncode != 0 and returncode != 11:
                     error_msg = f"czkawka_cli exited with code {returncode}"
+                    log.error("scan_cli_error", tab=self.tab.name,
+                              exit_code=returncode,
+                              stderr_lines=len(self._stderr_lines))
                     self.error.emit(error_msg)
                     return
 
@@ -85,16 +105,26 @@ class ScanWorker(QObject):
                     step_name="Loading results...", current=0, total=0
                 ))
                 results = self._parse_results(json_output_path)
+                elapsed = time.monotonic() - t0
+                result_count = sum(1 for r in results if not r.header_row)
+                log.info("scan_finished", tab=self.tab.name,
+                         results=result_count, elapsed_s=round(elapsed, 2),
+                         diagnostics=len(self._stderr_lines))
+                if self._stderr_lines:
+                    self.diagnostics.emit(self._stderr_lines)
                 self.finished.emit(self.tab, results)
             finally:
                 self._cleanup(json_output_path)
 
         except FileNotFoundError:
+            log.error("scan_cli_not_found",
+                      cli_path=self.app_settings.czkawka_cli_path)
             self.error.emit(
                 f"czkawka_cli not found at '{self.app_settings.czkawka_cli_path}'. "
                 "Please install czkawka_cli or set the correct path in settings."
             )
         except Exception as e:
+            log.exception("scan_unexpected_error", tab=self.tab.name)
             self.error.emit(str(e))
 
     def cancel(self):
@@ -151,9 +181,8 @@ class ScanWorker(QObject):
                 bytes_to_check=progress.get("bytes_to_check", 0),
             ))
         except (json.JSONDecodeError, KeyError, TypeError):
-            import logging
-            if line.startswith("{"):
-                logging.warning("Failed to parse progress JSON: %s", line[:200])
+            # Collect non-JSON stderr lines as diagnostics
+            self._stderr_lines.append(line)
 
     def _cleanup(self, path: str):
         try:
@@ -184,11 +213,11 @@ class ScanWorker(QObject):
         if s.excluded_paths:
             cmd.extend(["-e", ",".join(s.excluded_paths)])
         if s.excluded_items:
-            cmd.extend(["-E", s.excluded_items])
+            cmd.extend(["-E", ",".join(s.excluded_items)])
         if s.allowed_extensions:
-            cmd.extend(["-x", s.allowed_extensions])
+            cmd.extend(["-x", ",".join(s.allowed_extensions)])
         if s.excluded_extensions:
-            cmd.extend(["-P", s.excluded_extensions])
+            cmd.extend(["-P", ",".join(s.excluded_extensions)])
         if not s.recursive_search:
             cmd.append("-R")
         if not s.use_cache:
@@ -289,6 +318,11 @@ class ScanWorker(QObject):
                 cmd.extend(["--quality", str(ts.video_quality)])
                 if ts.video_fail_if_bigger:
                     cmd.append("--fail-if-not-smaller")
+
+        elif self.tab == ActiveTab.SIMILAR_DOCUMENTS:
+            cmd.extend(["--similarity-threshold", str(ts.doc_similarity_threshold)])
+            cmd.extend(["--num-hashes", str(ts.doc_num_hashes)])
+            cmd.extend(["--shingle-size", str(ts.doc_shingle_size)])
 
         return cmd
 
@@ -407,17 +441,20 @@ class ScanRunner(QObject):
     finished = Signal(object, list)
     progress = Signal(object)
     error = Signal(str)
+    diagnostics = Signal(list)  # non-JSON stderr lines from backend
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._thread: Optional[QThread] = None
         self._worker: Optional[ScanWorker] = None
+        self._active_tab: ActiveTab = ActiveTab.DUPLICATE_FILES
 
     def start_scan(self, tab: ActiveTab, app_settings: AppSettings,
                    tool_settings: ToolSettings):
         if self._thread and self._thread.isRunning():
             return
 
+        self._active_tab = tab
         self._thread = QThread()
         self._worker = ScanWorker(tab, app_settings, tool_settings)
         self._worker.moveToThread(self._thread)
@@ -426,6 +463,7 @@ class ScanRunner(QObject):
         self._worker.finished.connect(self._on_finished)
         self._worker.progress.connect(self.progress.emit)
         self._worker.error.connect(self._on_error)
+        self._worker.diagnostics.connect(self.diagnostics.emit)
 
         self._thread.start()
 
@@ -448,9 +486,10 @@ class ScanRunner(QObject):
             from PySide6.QtCore import QTimer
             QTimer.singleShot(200, self._check_stop_cleanup)
         else:
+            tab = self._active_tab
             self._thread = None
             self._worker = None
-            self.finished.emit(ActiveTab.DUPLICATE_FILES, [])
+            self.finished.emit(tab, [])
 
     def _on_finished(self, tab, results):
         self.finished.emit(tab, results)
@@ -477,6 +516,8 @@ class FileOperations:
     @staticmethod
     def delete_files(entries: list[ResultEntry], move_to_trash: bool = True,
                      dry_run: bool = False) -> tuple[int, list[str]]:
+        log.info("delete_started", count=len(entries),
+                 move_to_trash=move_to_trash, dry_run=dry_run)
         deleted = 0
         errors = []
         for entry in entries:
@@ -508,6 +549,7 @@ class FileOperations:
                 deleted += 1
             except OSError as e:
                 errors.append(f"Error deleting {path}: {e}")
+        log.info("delete_finished", deleted=deleted, errors=len(errors))
         return deleted, errors
 
     @staticmethod
@@ -515,6 +557,9 @@ class FileOperations:
                    preserve_structure: bool = False, copy_mode: bool = False,
                    dry_run: bool = False) -> tuple[int, list[str]]:
         import shutil
+        action = "copy" if copy_mode else "move"
+        log.info(f"{action}_started", count=len(entries),
+                 destination=destination, dry_run=dry_run)
         moved = 0
         errors = []
         dest = Path(destination)
@@ -559,6 +604,7 @@ class FileOperations:
                 moved += 1
             except OSError as e:
                 errors.append(f"Error moving {src_path}: {e}")
+        log.info(f"{action}_finished", moved=moved, errors=len(errors))
         return moved, errors
 
     @staticmethod

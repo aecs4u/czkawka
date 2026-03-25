@@ -19,6 +19,7 @@ class ActiveTab(Enum):
     BAD_NAMES = auto()
     EXIF_REMOVER = auto()
     VIDEO_OPTIMIZER = auto()
+    SIMILAR_DOCUMENTS = auto()
     SETTINGS = auto()
     ABOUT = auto()
 
@@ -122,6 +123,7 @@ TAB_TO_CLI_COMMAND = {
     ActiveTab.BAD_NAMES: "bad-names",
     ActiveTab.EXIF_REMOVER: "exif-remover",
     ActiveTab.VIDEO_OPTIMIZER: "video-optimizer",
+    ActiveTab.SIMILAR_DOCUMENTS: "similar-docs",
 }
 
 # Fluent translation keys for tab display names (resolved via tr() at point of use)
@@ -140,6 +142,7 @@ TAB_DISPLAY_KEYS = {
     ActiveTab.BAD_NAMES: "tool-bad-names",
     ActiveTab.EXIF_REMOVER: "tool-exif-remover",
     ActiveTab.VIDEO_OPTIMIZER: "tool-video-optimizer",
+    ActiveTab.SIMILAR_DOCUMENTS: "tool-similar-documents",
 }
 
 # Which tabs support grouping (results are in groups)
@@ -148,6 +151,7 @@ GROUPED_TABS = {
     ActiveTab.SIMILAR_IMAGES,
     ActiveTab.SIMILAR_VIDEOS,
     ActiveTab.SIMILAR_MUSIC,
+    ActiveTab.SIMILAR_DOCUMENTS,
 }
 
 # Which tabs have per-tool settings
@@ -161,6 +165,7 @@ TABS_WITH_SETTINGS = {
     ActiveTab.BAD_NAMES,
     ActiveTab.EXIF_REMOVER,
     ActiveTab.VIDEO_OPTIMIZER,
+    ActiveTab.SIMILAR_DOCUMENTS,
 }
 
 # Column definitions per tab
@@ -179,6 +184,7 @@ TAB_COLUMNS = {
     ActiveTab.BAD_NAMES: ["Selection", "File Name", "Path", "Error Type"],
     ActiveTab.EXIF_REMOVER: ["Selection", "File Name", "Path"],
     ActiveTab.VIDEO_OPTIMIZER: ["Selection", "File Name", "Path", "Size", "Codec"],
+    ActiveTab.SIMILAR_DOCUMENTS: ["Selection", "Similarity", "Size", "File Name", "Path", "Modification Date"],
 }
 
 
@@ -271,6 +277,11 @@ class ToolSettings:
     # EXIF Remover
     exif_ignored_tags: str = ""
 
+    # Similar Documents
+    doc_similarity_threshold: float = 0.7  # 0.0-1.0
+    doc_num_hashes: int = 128
+    doc_shingle_size: int = 3
+
     # Video Optimizer
     video_opt_mode: str = "crop"  # crop or transcode
     video_crop_mechanism: VideoCropMechanism = VideoCropMechanism.BLACKBARS
@@ -292,9 +303,9 @@ class AppSettings:
     """Global application settings."""
     included_paths: list = field(default_factory=lambda: [str(Path.home())])
     excluded_paths: list = field(default_factory=list)
-    excluded_items: str = ""
-    allowed_extensions: str = ""
-    excluded_extensions: str = ""
+    excluded_items: list = field(default_factory=list)
+    allowed_extensions: list = field(default_factory=list)
+    excluded_extensions: list = field(default_factory=list)
     minimum_file_size: str = ""
     maximum_file_size: str = ""
     recursive_search: bool = True

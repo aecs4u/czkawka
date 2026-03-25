@@ -202,26 +202,29 @@ class SettingsPanel(QWidget):
         layout = QFormLayout(widget)
 
         # Excluded items
-        self._excluded_items = QLineEdit(self._settings.excluded_items)
+        self._excluded_items = QLineEdit(",".join(self._settings.excluded_items))
         self._excluded_items.setPlaceholderText(tr("settings-excluded-items-hint"))
         self._excluded_items.textChanged.connect(
-            lambda t: setattr(self._settings, 'excluded_items', t)
+            lambda t: setattr(self._settings, 'excluded_items',
+                              [s.strip() for s in t.split(",") if s.strip()])
         )
         layout.addRow(tr("settings-excluded-items"), self._excluded_items)
 
         # Allowed extensions
-        self._allowed_ext = QLineEdit(self._settings.allowed_extensions)
+        self._allowed_ext = QLineEdit(",".join(self._settings.allowed_extensions))
         self._allowed_ext.setPlaceholderText(tr("settings-allowed-extensions-hint"))
         self._allowed_ext.textChanged.connect(
-            lambda t: setattr(self._settings, 'allowed_extensions', t)
+            lambda t: setattr(self._settings, 'allowed_extensions',
+                              [s.strip() for s in t.split(",") if s.strip()])
         )
         layout.addRow(tr("settings-allowed-extensions"), self._allowed_ext)
 
         # Excluded extensions
-        self._excluded_ext = QLineEdit(self._settings.excluded_extensions)
+        self._excluded_ext = QLineEdit(",".join(self._settings.excluded_extensions))
         self._excluded_ext.setPlaceholderText(tr("settings-excluded-extensions-hint"))
         self._excluded_ext.textChanged.connect(
-            lambda t: setattr(self._settings, 'excluded_extensions', t)
+            lambda t: setattr(self._settings, 'excluded_extensions',
+                              [s.strip() for s in t.split(",") if s.strip()])
         )
         layout.addRow(tr("settings-excluded-extensions"), self._excluded_ext)
 

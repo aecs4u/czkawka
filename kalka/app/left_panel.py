@@ -33,6 +33,7 @@ class LeftPanel(QWidget):
         ActiveTab.BAD_NAMES,
         ActiveTab.EXIF_REMOVER,
         ActiveTab.VIDEO_OPTIMIZER,
+        ActiveTab.SIMILAR_DOCUMENTS,
     ]
 
     def __init__(self, parent=None):

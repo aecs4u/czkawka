@@ -84,6 +84,7 @@ tool-bad-extensions = Bad Extensions
 tool-bad-names = Bad Names
 tool-exif-remover = EXIF Remover
 tool-video-optimizer = Video Optimizer
+tool-similar-documents = Similar Documents
 
 # ── Column headers ────────────────────────────────────────
 column-selection = Selection
@@ -398,3 +399,8 @@ subsettings-vo-crop = Crop
 subsettings-vo-transcode = Transcode
 subsettings-crop-black-bars = Black Bars
 subsettings-crop-static-content = Static Content
+
+# Similar Documents
+subsettings-doc-similarity = Similarity Threshold:
+subsettings-doc-num-hashes = Number of Hashes:
+subsettings-doc-shingle-size = Shingle Size (words):

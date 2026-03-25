@@ -1,9 +1,20 @@
 import json
+from enum import Enum, auto
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, QStandardPaths
+from .logger import get_logger
 from .models import (
     ActiveTab, AppSettings, ToolSettings, ResultEntry, ScanProgress
 )
+
+log = get_logger("state")
+
+
+class ScanState(Enum):
+    """State machine for scan lifecycle."""
+    IDLE = auto()
+    SCANNING = auto()
+    STOPPING = auto()
 
 
 class AppState(QObject):
@@ -23,9 +34,7 @@ class AppState(QObject):
     def __init__(self):
         super().__init__()
         self.active_tab = ActiveTab.DUPLICATE_FILES
-        self.scanning = False
-        self.processing = False
-        self.stop_requested = False
+        self._scan_state = ScanState.IDLE
         self.settings = AppSettings()
         self.tool_settings = ToolSettings()
         self.results: dict[ActiveTab, list[ResultEntry]] = {}
@@ -43,16 +52,29 @@ class AppState(QObject):
             self.active_tab = tab
             self.tab_changed.emit(tab)
 
+    @property
+    def scanning(self) -> bool:
+        return self._scan_state == ScanState.SCANNING
+
+    @property
+    def stop_requested(self) -> bool:
+        return self._scan_state == ScanState.STOPPING
+
+    @property
+    def scan_state(self) -> ScanState:
+        return self._scan_state
+
     def set_scanning(self, scanning: bool):
-        self.scanning = scanning
         if scanning:
-            self.stop_requested = False
+            self._scan_state = ScanState.SCANNING
             self.scan_started.emit()
         else:
+            self._scan_state = ScanState.IDLE
             self.scan_finished.emit()
 
     def request_stop(self):
-        self.stop_requested = True
+        if self._scan_state == ScanState.SCANNING:
+            self._scan_state = ScanState.STOPPING
 
     def update_progress(self, progress: ScanProgress):
         self.progress = progress
@@ -96,8 +118,9 @@ class AppState(QObject):
         }
         try:
             config_file.write_text(json.dumps(data, indent=2))
-        except OSError:
-            pass
+            log.debug("settings_saved", path=str(config_file))
+        except OSError as e:
+            log.warning("settings_save_failed", path=str(config_file), error=str(e))
 
     def load_settings(self):
         config_file = self._config_path / "settings.json"
@@ -107,9 +130,9 @@ class AppState(QObject):
                 s = self.settings
                 s.included_paths = data.get("included_paths", s.included_paths)
                 s.excluded_paths = data.get("excluded_paths", s.excluded_paths)
-                s.excluded_items = data.get("excluded_items", s.excluded_items)
-                s.allowed_extensions = data.get("allowed_extensions", s.allowed_extensions)
-                s.excluded_extensions = data.get("excluded_extensions", s.excluded_extensions)
+                s.excluded_items = self._load_list_setting(data, "excluded_items", s.excluded_items)
+                s.allowed_extensions = self._load_list_setting(data, "allowed_extensions", s.allowed_extensions)
+                s.excluded_extensions = self._load_list_setting(data, "excluded_extensions", s.excluded_extensions)
                 s.minimum_file_size = data.get("minimum_file_size", s.minimum_file_size)
                 s.maximum_file_size = data.get("maximum_file_size", s.maximum_file_size)
                 s.recursive_search = data.get("recursive_search", s.recursive_search)
@@ -122,8 +145,19 @@ class AppState(QObject):
                 s.show_image_preview = data.get("show_image_preview", s.show_image_preview)
                 s.czkawka_cli_path = data.get("czkawka_cli_path", s.czkawka_cli_path)
                 s.language = data.get("language", s.language)
-            except (json.JSONDecodeError, OSError):
-                pass
+                log.debug("settings_loaded", path=str(config_file))
+            except (json.JSONDecodeError, OSError) as e:
+                log.warning("settings_load_failed", path=str(config_file), error=str(e))
+
+    @staticmethod
+    def _load_list_setting(data: dict, key: str, default: list) -> list:
+        """Load a list setting, handling backward compat with old string format."""
+        val = data.get(key, default)
+        if isinstance(val, str):
+            return [s.strip() for s in val.split(",") if s.strip()]
+        if isinstance(val, list):
+            return val
+        return default
 
     # ── Scan Profiles ──────────────────────────────────────
 

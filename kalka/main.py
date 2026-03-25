@@ -7,8 +7,8 @@ czkawka_cli binary as its backend for all scanning operations.
 
 Usage:
     python main.py
-    # or
-    python -m kalka.main
+    python main.py --log-level DEBUG
+    python main.py --log-file /tmp/kalka.log
 
 Requirements:
     - PySide6 >= 6.6.0
@@ -19,9 +19,39 @@ Requirements:
 
 import sys
 import os
+from enum import Enum
+from typing import Optional
+
+import typer
 
 
-def main():
+class LogLevel(str, Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
+app = typer.Typer(add_completion=False)
+
+
+@app.command()
+def main(
+    log_level: LogLevel = typer.Option(
+        LogLevel.WARNING,
+        help="Set logging verbosity.",
+    ),
+    log_file: Optional[str] = typer.Option(
+        None,
+        help="Write structured JSON logs to this local file.",
+    ),
+):
+    """Kalka - PySide6 GUI for czkawka file cleanup."""
+
+    # Initialize structured logging before anything else
+    from app.logger import init as init_logging
+    init_logging(level=log_level.value, log_file=log_file)
+
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt
 
@@ -43,12 +73,12 @@ def main():
         pass
     init_l10n(locale_override)
 
-    app = QApplication(sys.argv)
-    app.setApplicationName("Kalka")
-    app.setApplicationVersion("11.0.1")
-    app.setOrganizationName("czkawka")
-    app.setOrganizationDomain("github.com/qarmin")
-    app.setDesktopFileName("com.github.qarmin.kalka")
+    qt_app = QApplication(sys.argv[:1])
+    qt_app.setApplicationName("Kalka")
+    qt_app.setApplicationVersion("11.0.1")
+    qt_app.setOrganizationName("czkawka")
+    qt_app.setOrganizationDomain("github.com/qarmin")
+    qt_app.setDesktopFileName("com.github.qarmin.kalka")
 
     # Set application icon — use XDG theme icon with fallback to project logo
     from PySide6.QtGui import QIcon
@@ -57,15 +87,15 @@ def main():
         from app.icons import app_icon
         icon = app_icon()
     if not icon.isNull():
-        app.setWindowIcon(icon)
+        qt_app.setWindowIcon(icon)
 
     # Import and create main window
     from app.main_window import MainWindow
     window = MainWindow()
     window.show()
 
-    sys.exit(app.exec())
+    sys.exit(qt_app.exec())
 
 
 if __name__ == "__main__":
-    main()
+    app()
