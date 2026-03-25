@@ -13,7 +13,7 @@ use czkawka_core::common::logger::{filtering_messages, print_version_mode, setup
 use czkawka_core::common::progress_data::ProgressData;
 use czkawka_core::common::set_number_of_threads;
 use czkawka_core::common::tool_data::{CommonData, DeleteMethod};
-use czkawka_core::common::traits::{AllTraits, FixingItems, PrintResults, Search};
+use czkawka_core::common::traits::{AllTraits, FixingItems, PrintResults};
 use czkawka_core::tools::bad_extensions::{BadExtensions, BadExtensionsFixParams, BadExtensionsParameters};
 use czkawka_core::tools::bad_names::{BadNames, BadNamesParameters, NameFixerParams, NameIssues};
 use czkawka_core::tools::big_file::{BigFile, BigFileParameters, SearchMode};
@@ -48,6 +48,56 @@ pub struct CliOutput {
     pub ignored_error_code_on_found: bool,
     pub had_save_errors: bool,
     pub output: String,
+}
+
+struct ToolRunner<'a, T: AllTraits + PrintResults> {
+    tool: T,
+    common_cli_items: &'a CommonCliItems,
+    reference_directories: Option<&'a Vec<PathBuf>>,
+}
+
+impl<'a, T: AllTraits + PrintResults> ToolRunner<'a, T> {
+    fn new(tool: T, common_cli_items: &'a CommonCliItems) -> Self {
+        Self {
+            tool,
+            common_cli_items,
+            reference_directories: None,
+        }
+    }
+
+    fn with_references(mut self, dirs: &'a Vec<PathBuf>) -> Self {
+        self.reference_directories = Some(dirs);
+        self
+    }
+
+    fn configure(mut self, f: impl FnOnce(&mut T)) -> Self {
+        f(&mut self.tool);
+        self
+    }
+
+    fn run(mut self, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
+        set_common_settings(&mut self.tool, self.common_cli_items, self.reference_directories);
+        self.tool.search(stop_flag, Some(progress_sender));
+        save_and_write_results_to_writer(&self.tool, self.common_cli_items, tool_type)
+    }
+
+    fn run_with_fix(
+        mut self,
+        stop_flag: &Arc<AtomicBool>,
+        progress_sender: &Sender<ProgressData>,
+        tool_type: &str,
+        fix_params: Option<T::FixParams>,
+    ) -> CliOutput
+    where
+        T: FixingItems,
+    {
+        set_common_settings(&mut self.tool, self.common_cli_items, self.reference_directories);
+        self.tool.search(stop_flag, Some(progress_sender));
+        if let Some(params) = fix_params {
+            self.tool.fix_items(stop_flag, Some(progress_sender), params);
+        }
+        save_and_write_results_to_writer(&self.tool, self.common_cli_items, tool_type)
+    }
 }
 
 fn main() {
@@ -153,30 +203,23 @@ fn duplicates(duplicates: DuplicatesArgs, stop_flag: &Arc<AtomicBool>, progress_
     )
     .with_name_similarity_threshold(name_similarity_threshold)
     .with_no_self_compare(no_self_compare);
-    let mut tool = DuplicateFinder::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, Some(reference_directories.reference_directories.as_ref()));
-    tool.set_minimal_file_size(minimal_file_size);
-    tool.set_maximal_file_size(maximal_file_size);
-    tool.set_hide_hard_links(!allow_hard_links.allow_hard_links);
-    set_advanced_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(DuplicateFinder::new(params), &common_cli_items)
+        .with_references(&reference_directories.reference_directories)
+        .configure(|tool| {
+            tool.set_minimal_file_size(minimal_file_size);
+            tool.set_maximal_file_size(maximal_file_size);
+            tool.set_hide_hard_links(!allow_hard_links.allow_hard_links);
+            set_advanced_delete(tool, delete_method);
+        })
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn empty_folders(empty_folders: EmptyFoldersArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let EmptyFoldersArgs { common_cli_items, delete_method } = empty_folders;
-
-    let mut tool = EmptyFolder::new();
-
-    set_common_settings(&mut tool, &common_cli_items, None);
-    set_simple_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(EmptyFolder::new(), &common_cli_items)
+        .configure(|tool| set_simple_delete(tool, delete_method))
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn biggest_files(biggest_files: BiggestFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
@@ -189,40 +232,24 @@ fn biggest_files(biggest_files: BiggestFilesArgs, stop_flag: &Arc<AtomicBool>, p
 
     let big_files_mode = if smallest_mode { SearchMode::SmallestFiles } else { SearchMode::BiggestFiles };
     let params = BigFileParameters::new(number_of_files, big_files_mode);
-    let mut tool = BigFile::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, None);
-    set_simple_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(BigFile::new(params), &common_cli_items)
+        .configure(|tool| set_simple_delete(tool, delete_method))
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn empty_files(empty_files: EmptyFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let EmptyFilesArgs { common_cli_items, delete_method } = empty_files;
-
-    let mut tool = EmptyFiles::new();
-
-    set_common_settings(&mut tool, &common_cli_items, None);
-    set_simple_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(EmptyFiles::new(), &common_cli_items)
+        .configure(|tool| set_simple_delete(tool, delete_method))
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn temporary(temporary: TemporaryArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let TemporaryArgs { common_cli_items, delete_method } = temporary;
-
-    let mut tool = Temporary::new();
-
-    set_common_settings(&mut tool, &common_cli_items, None);
-    set_simple_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(Temporary::new(), &common_cli_items)
+        .configure(|tool| set_simple_delete(tool, delete_method))
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn similar_images(similar_images: SimilarImagesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
@@ -241,17 +268,16 @@ fn similar_images(similar_images: SimilarImagesArgs, stop_flag: &Arc<AtomicBool>
     } = similar_images;
 
     let params = SimilarImagesParameters::new(max_difference, hash_size, hash_alg, image_filter, ignore_same_size.ignore_same_size);
-    let mut tool = SimilarImages::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, Some(reference_directories.reference_directories.as_ref()));
-    tool.set_minimal_file_size(minimal_file_size);
-    tool.set_maximal_file_size(maximal_file_size);
-    tool.set_hide_hard_links(!allow_hard_links.allow_hard_links);
-    set_advanced_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(SimilarImages::new(params), &common_cli_items)
+        .with_references(&reference_directories.reference_directories)
+        .configure(|tool| {
+            tool.set_minimal_file_size(minimal_file_size);
+            tool.set_maximal_file_size(maximal_file_size);
+            tool.set_hide_hard_links(!allow_hard_links.allow_hard_links);
+            set_advanced_delete(tool, delete_method);
+        })
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn same_music(same_music: SameMusicArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
@@ -281,29 +307,22 @@ fn same_music(same_music: SameMusicArgs, stop_flag: &Arc<AtomicBool>, progress_s
     );
     params.fuzzy_tag_comparison = fuzzy_tag_comparison;
     params.tag_similarity_threshold = tag_similarity_threshold;
-    let mut tool = SameMusic::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, Some(reference_directories.reference_directories.as_ref()));
-    tool.set_minimal_file_size(minimal_file_size);
-    tool.set_maximal_file_size(maximal_file_size);
-    set_advanced_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(SameMusic::new(params), &common_cli_items)
+        .with_references(&reference_directories.reference_directories)
+        .configure(|tool| {
+            tool.set_minimal_file_size(minimal_file_size);
+            tool.set_maximal_file_size(maximal_file_size);
+            set_advanced_delete(tool, delete_method);
+        })
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn invalid_symlinks(invalid_symlinks: InvalidSymlinksArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let InvalidSymlinksArgs { common_cli_items, delete_method } = invalid_symlinks;
-
-    let mut tool = InvalidSymlinks::new();
-
-    set_common_settings(&mut tool, &common_cli_items, None);
-    set_simple_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(InvalidSymlinks::new(), &common_cli_items)
+        .configure(|tool| set_simple_delete(tool, delete_method))
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn broken_files(broken_files: BrokenFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
@@ -318,14 +337,10 @@ fn broken_files(broken_files: BrokenFilesArgs, stop_flag: &Arc<AtomicBool>, prog
         checked_type |= check_type;
     }
     let params = BrokenFilesParameters::new(checked_type);
-    let mut tool = BrokenFiles::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, None);
-    set_simple_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(BrokenFiles::new(params), &common_cli_items)
+        .configure(|tool| set_simple_delete(tool, delete_method))
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn similar_videos(similar_videos: SimilarVideosArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
@@ -354,35 +369,22 @@ fn similar_videos(similar_videos: SimilarVideosArgs, stop_flag: &Arc<AtomicBool>
         false, // creating thumbnails in CLI, makes almost no sense
         2,     // creating thumbnails in CLI, makes almost no sense
     );
-    let mut tool = SimilarVideos::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, Some(reference_directories.reference_directories.as_ref()));
-    tool.set_minimal_file_size(minimal_file_size);
-    tool.set_maximal_file_size(maximal_file_size);
-    tool.set_hide_hard_links(!allow_hard_links.allow_hard_links);
-    set_advanced_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(SimilarVideos::new(params), &common_cli_items)
+        .with_references(&reference_directories.reference_directories)
+        .configure(|tool| {
+            tool.set_minimal_file_size(minimal_file_size);
+            tool.set_maximal_file_size(maximal_file_size);
+            tool.set_hide_hard_links(!allow_hard_links.allow_hard_links);
+            set_advanced_delete(tool, delete_method);
+        })
+        .run(stop_flag, progress_sender, tool_type)
 }
 
 fn bad_extensions(bad_extensions: BadExtensionsArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let BadExtensionsArgs { common_cli_items, fix_extensions } = bad_extensions;
-
-    let params = BadExtensionsParameters::new();
-    let mut tool = BadExtensions::new(params);
-
-    set_common_settings(&mut tool, &common_cli_items, None);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    if fix_extensions {
-        let fix_params = BadExtensionsFixParams {};
-        tool.fix_items(stop_flag, Some(progress_sender), fix_params);
-    }
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(BadExtensions::new(BadExtensionsParameters::new()), &common_cli_items)
+        .run_with_fix(stop_flag, progress_sender, tool_type, fix_extensions.then_some(BadExtensionsFixParams {}))
 }
 
 fn bad_names(bad_names: BadNamesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
@@ -415,19 +417,10 @@ fn bad_names(bad_names: BadNamesArgs, stop_flag: &Arc<AtomicBool>, progress_send
     };
 
     let params = BadNamesParameters::new(name_issues);
-    let mut tool = BadNames::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, None);
-    set_simple_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    if fix_names {
-        let fix_params = NameFixerParams::default();
-        tool.fix_items(stop_flag, Some(progress_sender), fix_params);
-    }
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(BadNames::new(params), &common_cli_items)
+        .configure(|tool| set_simple_delete(tool, delete_method))
+        .run_with_fix(stop_flag, progress_sender, tool_type, fix_names.then(NameFixerParams::default))
 }
 
 fn video_optimizer(video_optimizer: VideoOptimizerArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
@@ -466,24 +459,18 @@ fn video_optimizer(video_optimizer: VideoOptimizerArgs, stop_flag: &Arc<AtomicBo
                 thumbnail_grid_tiles_per_side,
             ));
 
-            let mut tool = VideoOptimizer::new(params);
-            set_common_settings(&mut tool, &common_cli_items, None);
-            tool.search(stop_flag, Some(progress_sender));
+            let fix_params = fix_videos.then_some(VideoOptimizerFixParams::VideoTranscode(VideoTranscodeFixParams {
+                codec: target_codec,
+                quality,
+                fail_if_not_smaller,
+                overwrite_original,
+                limit_video_size,
+                max_width,
+                max_height,
+            }));
 
-            if fix_videos {
-                let fix_params = VideoOptimizerFixParams::VideoTranscode(VideoTranscodeFixParams {
-                    codec: target_codec,
-                    quality,
-                    fail_if_not_smaller,
-                    overwrite_original,
-                    limit_video_size,
-                    max_width,
-                    max_height,
-                });
-                tool.fix_items(stop_flag, Some(progress_sender), fix_params);
-            }
-
-            save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+            ToolRunner::new(VideoOptimizer::new(params), &common_cli_items)
+                .run_with_fix(stop_flag, progress_sender, tool_type, fix_params)
         }
         CliVideoOptimizerMode::Crop(crop_args) => {
             let CropArgs {
@@ -521,21 +508,15 @@ fn video_optimizer(video_optimizer: VideoOptimizerArgs, stop_flag: &Arc<AtomicBo
                 thumbnail_grid_tiles_per_side,
             ));
 
-            let mut tool = VideoOptimizer::new(params);
-            set_common_settings(&mut tool, &common_cli_items, None);
-            tool.search(stop_flag, Some(progress_sender));
+            let fix_params = fix_videos.then_some(VideoOptimizerFixParams::VideoCrop(VideoCropFixParams {
+                overwrite_original,
+                target_codec,
+                quality,
+                crop_mechanism: crop_mech,
+            }));
 
-            if fix_videos {
-                let fix_params = VideoOptimizerFixParams::VideoCrop(VideoCropFixParams {
-                    overwrite_original,
-                    target_codec,
-                    quality,
-                    crop_mechanism: crop_mech,
-                });
-                tool.fix_items(stop_flag, Some(progress_sender), fix_params);
-            }
-
-            save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+            ToolRunner::new(VideoOptimizer::new(params), &common_cli_items)
+                .run_with_fix(stop_flag, progress_sender, tool_type, fix_params)
         }
     }
 }
@@ -549,20 +530,10 @@ fn exif_remover(exif_remover: ExifRemoverArgs, stop_flag: &Arc<AtomicBool>, prog
     } = exif_remover;
 
     let ignored_tags_vec = ignored_tags.map(|s| s.split(',').map(|tag| tag.trim().to_string()).collect()).unwrap_or_default();
-
     let params = ExifRemoverParameters::new(ignored_tags_vec);
-    let mut tool = ExifRemover::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, None);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    if fix_exif {
-        let fix_params = ExifTagsFixerParams { override_file };
-        tool.fix_items(stop_flag, Some(progress_sender), fix_params);
-    }
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(ExifRemover::new(params), &common_cli_items)
+        .run_with_fix(stop_flag, progress_sender, tool_type, fix_exif.then_some(ExifTagsFixerParams { override_file }))
 }
 
 fn save_and_write_results_to_writer<T: CommonData + PrintResults>(component: &T, common_cli_items: &CommonCliItems, tool_type: &str) -> CliOutput {
@@ -741,14 +712,12 @@ fn similar_documents(args: SimilarDocumentsArgs, stop_flag: &Arc<AtomicBool>, pr
     } = args;
 
     let params = SimilarDocumentsParameters::new(similarity_threshold, num_hashes, shingle_size);
-    let mut tool = SimilarDocuments::new(params);
 
-    set_common_settings(&mut tool, &common_cli_items, None);
-    tool.set_minimal_file_size(minimal_file_size);
-    tool.set_maximal_file_size(maximal_file_size);
-    set_advanced_delete(&mut tool, delete_method);
-
-    tool.search(stop_flag, Some(progress_sender));
-
-    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
+    ToolRunner::new(SimilarDocuments::new(params), &common_cli_items)
+        .configure(|tool| {
+            tool.set_minimal_file_size(minimal_file_size);
+            tool.set_maximal_file_size(maximal_file_size);
+            set_advanced_delete(tool, delete_method);
+        })
+        .run(stop_flag, progress_sender, tool_type)
 }
