@@ -114,29 +114,35 @@ class ResultsView(QWidget):
         self._update_summary()
 
     def _rebuild_tree(self):
-        """Rebuild tree items from self._results."""
+        """Rebuild tree items from self._results.
+
+        Uses batch insertion and deferred header spanning for performance.
+        """
         self._tree.blockSignals(True)
+        self._tree.setUpdatesEnabled(False)
         self._tree.clear()
 
         columns = TAB_COLUMNS.get(self._active_tab, ["Selection", "File Name", "Path"])
+        num_cols = len(columns)
+
+        items = []
+        header_indices = []
 
         for entry in self._results:
             if entry.header_row:
                 item = QTreeWidgetItem()
                 header_text = entry.values.get("__header", "Group")
                 item.setText(0, header_text)
-                item.setFirstColumnSpanned(True)
                 font = QFont()
                 font.setBold(True)
                 item.setFont(0, font)
-                for col in range(len(columns)):
+                for col in range(num_cols):
                     item.setBackground(col, QBrush(self.HEADER_BG))
                     item.setForeground(col, QBrush(self.HEADER_FG))
                 item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
                 item.setData(0, Qt.UserRole, entry)
-                self._tree.addTopLevelItem(item)
-                # Span header across all columns (must be called after adding to tree)
-                item.setFirstColumnSpanned(True)
+                header_indices.append(len(items))
+                items.append(item)
             else:
                 item = QTreeWidgetItem()
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
@@ -149,8 +155,16 @@ class ResultsView(QWidget):
                     item.setText(col_idx, str(value))
 
                 item.setData(0, Qt.UserRole, entry)
-                self._tree.addTopLevelItem(item)
+                items.append(item)
 
+        # Batch insert all items at once (much faster than one-by-one)
+        self._tree.addTopLevelItems(items)
+
+        # Header spanning must be set after items are added to the tree
+        for idx in header_indices:
+            self._tree.topLevelItem(idx).setFirstColumnSpanned(True)
+
+        self._tree.setUpdatesEnabled(True)
         self._tree.blockSignals(False)
 
     # ── Sorting ──────────────────────────────────────────────
@@ -340,14 +354,6 @@ class ResultsView(QWidget):
         item.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
 
     # ── Summary / selection ──────────────────────────────────
-
-    @staticmethod
-    def _format_size(size_bytes: int) -> str:
-        for unit in ("B", "KB", "MB", "GB", "TB"):
-            if abs(size_bytes) < 1024:
-                return f"{size_bytes:.1f} {unit}" if unit != "B" else f"{size_bytes} B"
-            size_bytes /= 1024
-        return f"{size_bytes:.1f} PB"
 
     def _update_summary(self):
         entries = [r for r in self._results if not r.header_row]

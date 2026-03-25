@@ -125,11 +125,10 @@ def icon_info(size=24):
 
 
 def app_logo_path() -> str:
-    """Return absolute path to the Krokiet logo PNG."""
+    """Return absolute path to the kalka logo PNG."""
     from pathlib import Path
-    # Try relative to this file first, then absolute project path
     for candidate in [
-        Path(__file__).parent.parent.parent / "krokiet" / "icons" / "krokiet_logo.png",
+        Path(__file__).parent.parent / "icons" / "kalka.png",
     ]:
         if candidate.exists():
             return str(candidate)
@@ -137,7 +136,7 @@ def app_logo_path() -> str:
 
 
 def app_icon() -> QIcon:
-    """Return the application window icon from the Krokiet logo."""
+    """Return the application window icon from the kalka logo."""
     path = app_logo_path()
     if path:
         return QIcon(path)

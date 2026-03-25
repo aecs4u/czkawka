@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -391,18 +392,6 @@ class ScanWorker(QObject):
         return ResultEntry(values=values, group_id=group_id)
 
     @staticmethod
-    def _format_size(size_bytes: int) -> str:
-        if size_bytes == 0:
-            return "0 B"
-        units = ["B", "KB", "MB", "GB", "TB"]
-        i = 0
-        size = float(size_bytes)
-        while size >= 1024 and i < len(units) - 1:
-            size /= 1024
-            i += 1
-        return f"{size:.1f} {units[i]}" if i > 0 else f"{int(size)} B"
-
-    @staticmethod
     def _format_date(timestamp: int) -> str:
         if timestamp == 0:
             return ""
@@ -443,15 +432,24 @@ class ScanRunner(QObject):
     def stop_scan(self):
         if self._worker:
             self._worker.cancel()
-            # Wait briefly for the thread to finish after killing the process
-            if self._thread and self._thread.isRunning():
-                self._thread.quit()
-                if not self._thread.wait(5000):
-                    self._thread.terminate()
-                    self._thread.wait()
+        # Non-blocking: let _on_finished/_on_error handle cleanup
+        # The worker's cancel() kills the subprocess, which causes
+        # the worker to emit finished/error, triggering cleanup.
+        if self._thread and self._thread.isRunning():
+            self._thread.quit()
+            # Use a short non-blocking timer to check completion
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(200, self._check_stop_cleanup)
+
+    def _check_stop_cleanup(self):
+        """Non-blocking check if thread finished after stop request."""
+        if self._thread and self._thread.isRunning():
+            # Still running, try again shortly
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(200, self._check_stop_cleanup)
+        else:
             self._thread = None
             self._worker = None
-            # Emit an empty result to signal completion
             self.finished.emit(ActiveTab.DUPLICATE_FILES, [])
 
     def _on_finished(self, tab, results):
@@ -465,9 +463,12 @@ class ScanRunner(QObject):
     def _cleanup(self):
         if self._thread:
             self._thread.quit()
-            self._thread.wait(5000)
+            # Non-blocking: schedule deferred cleanup
+            from PySide6.QtCore import QTimer
+            thread_ref = self._thread
             self._thread = None
             self._worker = None
+            QTimer.singleShot(100, lambda: thread_ref.wait(1000) if thread_ref else None)
 
 
 class FileOperations:
@@ -607,6 +608,14 @@ class FileOperations:
             return False, str(e)
 
     @staticmethod
+    def fix_extensions_async(cli_path: str, app_settings, tool_settings, callback):
+        """Non-blocking version of fix_extensions. Calls callback(success, msg) on completion."""
+        def _run():
+            ok, msg = FileOperations.fix_extensions(cli_path, app_settings, tool_settings)
+            callback(ok, msg)
+        threading.Thread(target=_run, daemon=True).start()
+
+    @staticmethod
     def fix_bad_names(cli_path: str, app_settings, tool_settings) -> tuple[bool, str]:
         """Run czkawka_cli bad-names with -F flag to fix names."""
         cmd = [cli_path, "bad-names", "-F"]
@@ -617,6 +626,14 @@ class FileOperations:
             return True, result.stdout
         except Exception as e:
             return False, str(e)
+
+    @staticmethod
+    def fix_bad_names_async(cli_path: str, app_settings, tool_settings, callback):
+        """Non-blocking version of fix_bad_names. Calls callback(success, msg) on completion."""
+        def _run():
+            ok, msg = FileOperations.fix_bad_names(cli_path, app_settings, tool_settings)
+            callback(ok, msg)
+        threading.Thread(target=_run, daemon=True).start()
 
     @staticmethod
     def clean_exif(cli_path: str, entries: list[ResultEntry],
@@ -644,3 +661,12 @@ class FileOperations:
             except Exception as e:
                 errors.append(f"Error cleaning EXIF for {path}: {e}")
         return cleaned, errors
+
+    @staticmethod
+    def clean_exif_async(cli_path: str, entries: list[ResultEntry],
+                         ignored_tags: str, overwrite: bool, callback):
+        """Non-blocking version of clean_exif. Calls callback(cleaned, errors) on completion."""
+        def _run():
+            cleaned, errors = FileOperations.clean_exif(cli_path, entries, ignored_tags, overwrite)
+            callback(cleaned, errors)
+        threading.Thread(target=_run, daemon=True).start()

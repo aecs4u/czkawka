@@ -25,9 +25,23 @@ def main():
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt
 
-    # Initialize i18n before creating any widgets
+    # Initialize i18n before creating any widgets.
+    # Read saved language preference from config (before QApplication exists).
     from app.localizer import init as init_l10n
-    init_l10n()
+    locale_override = None
+    try:
+        import json
+        from pathlib import Path
+        config_dir = os.environ.get("XDG_CONFIG_HOME", os.path.join(Path.home(), ".config"))
+        config_file = Path(config_dir) / "czkawka" / "settings.json"
+        if config_file.exists():
+            data = json.loads(config_file.read_text())
+            lang = data.get("language", "")
+            if lang:
+                locale_override = lang
+    except Exception:
+        pass
+    init_l10n(locale_override)
 
     app = QApplication(sys.argv)
     app.setApplicationName("Kalka")

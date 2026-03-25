@@ -38,7 +38,7 @@ class SelectDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Simple selection buttons
-        simple_group = QGroupBox("Quick selection")
+        simple_group = QGroupBox(tr("select-quick-group"))
         simple_layout = QHBoxLayout(simple_group)
         for mode, ftl_key in self.SIMPLE_MODES:
             btn = QPushButton(tr(ftl_key))
@@ -53,14 +53,10 @@ class SelectDialog(QDialog):
         layout.addWidget(line)
 
         # Combined criteria
-        criteria_group = QGroupBox("Smart selection (combinable)")
+        criteria_group = QGroupBox(tr("select-smart-group"))
         criteria_layout = QVBoxLayout(criteria_group)
 
-        criteria_layout.addWidget(QLabel(
-            "Check multiple criteria to combine them.\n"
-            "AND = file must match ALL checked criteria.\n"
-            "OR = file must match ANY checked criterion."
-        ))
+        criteria_layout.addWidget(QLabel(tr("select-smart-help")))
 
         self._checkboxes: list[tuple[QCheckBox, SelectMode]] = []
         for mode, ftl_key in self.CRITERIA:
@@ -70,14 +66,14 @@ class SelectDialog(QDialog):
 
         # Combinator selector
         combinator_layout = QHBoxLayout()
-        combinator_layout.addWidget(QLabel("Combine with:"))
+        combinator_layout.addWidget(QLabel(tr("select-combine-with")))
         self._combinator = QComboBox()
-        self._combinator.addItems(["AND (all must match)", "OR (any must match)"])
+        self._combinator.addItems([tr("select-combine-and"), tr("select-combine-or")])
         combinator_layout.addWidget(self._combinator)
         criteria_layout.addLayout(combinator_layout)
 
         # Apply combined button
-        apply_btn = QPushButton("Apply combined selection")
+        apply_btn = QPushButton(tr("select-apply-combined"))
         apply_btn.clicked.connect(self._apply_combined)
         criteria_layout.addWidget(apply_btn)
 

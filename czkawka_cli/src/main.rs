@@ -567,23 +567,41 @@ fn exif_remover(exif_remover: ExifRemoverArgs, stop_flag: &Arc<AtomicBool>, prog
 fn save_and_write_results_to_writer<T: CommonData + PrintResults>(component: &T, common_cli_items: &CommonCliItems) -> CliOutput {
     let mut had_save_errors = false;
 
-    if let Some(file_name) = common_cli_items.file_to_save.file_name()
-        && let Err(e) = component.print_results_to_file(file_name)
-    {
-        error!("Failed to save results to file {e}");
-        had_save_errors = true;
+    match common_cli_items.file_to_save.file_name() {
+        Some(file_name) => {
+            if let Err(e) = component.print_results_to_file(file_name) {
+                error!("Failed to save results to file {e}");
+                had_save_errors = true;
+            }
+        }
+        None if common_cli_items.file_to_save.is_specified() => {
+            had_save_errors = true;
+        }
+        None => {}
     }
-    if let Some(file_name) = common_cli_items.json_compact_file_to_save.file_name()
-        && let Err(e) = component.save_results_to_file_as_json(file_name, false)
-    {
-        error!("Failed to save compact json results to file {e}");
-        had_save_errors = true;
+    match common_cli_items.json_compact_file_to_save.file_name() {
+        Some(file_name) => {
+            if let Err(e) = component.save_results_to_file_as_json(file_name, false) {
+                error!("Failed to save compact json results to file {e}");
+                had_save_errors = true;
+            }
+        }
+        None if common_cli_items.json_compact_file_to_save.is_specified() => {
+            had_save_errors = true;
+        }
+        None => {}
     }
-    if let Some(file_name) = common_cli_items.json_pretty_file_to_save.file_name()
-        && let Err(e) = component.save_results_to_file_as_json(file_name, true)
-    {
-        error!("Failed to save pretty json results to file {e}");
-        had_save_errors = true;
+    match common_cli_items.json_pretty_file_to_save.file_name() {
+        Some(file_name) => {
+            if let Err(e) = component.save_results_to_file_as_json(file_name, true) {
+                error!("Failed to save pretty json results to file {e}");
+                had_save_errors = true;
+            }
+        }
+        None if common_cli_items.json_pretty_file_to_save.is_specified() => {
+            had_save_errors = true;
+        }
+        None => {}
     }
 
     let mut buf_writer = std::io::BufWriter::new(Vec::new());

@@ -103,7 +103,7 @@ class ToolSettingsPanel(QWidget):
         self._dup_threshold_slider.valueChanged.connect(self._on_dup_threshold_changed)
         threshold_layout.addWidget(self._dup_threshold_slider)
         threshold_layout.addWidget(self._dup_threshold_label)
-        layout.addRow("Name similarity", threshold_widget)
+        layout.addRow(tr("subsettings-name-similarity"), threshold_widget)
 
         # Case sensitive
         self._dup_case = QCheckBox(tr("subsettings-case-sensitive"))
@@ -269,7 +269,7 @@ class ToolSettingsPanel(QWidget):
 
         # Search method
         self._music_method = QComboBox()
-        self._music_method.addItems(["Tags", "Fingerprint"])
+        self._music_method.addItems([tr("subsettings-music-tags"), tr("subsettings-music-fingerprint")])
         self._music_method.setCurrentIndex(
             0 if self._ts.music_search_method == MusicSearchMethod.TAGS else 1
         )
@@ -285,12 +285,12 @@ class ToolSettingsPanel(QWidget):
         self._music_approx.toggled.connect(lambda v: setattr(self._ts, 'music_approximate', v))
         tags_layout.addWidget(self._music_approx)
 
-        for attr, label in [
-            ("music_title", "Title"), ("music_artist", "Artist"),
-            ("music_bitrate", "Bitrate"), ("music_genre", "Genre"),
-            ("music_year", "Year"), ("music_length", "Length"),
+        for attr, ftl_key in [
+            ("music_title", "subsettings-music-title"), ("music_artist", "subsettings-music-artist"),
+            ("music_bitrate", "subsettings-music-bitrate"), ("music_genre", "subsettings-music-genre"),
+            ("music_year", "subsettings-music-year"), ("music_length", "subsettings-music-length"),
         ]:
-            cb = QCheckBox(label)
+            cb = QCheckBox(tr(ftl_key))
             cb.setChecked(getattr(self._ts, attr))
             cb.toggled.connect(lambda v, a=attr: setattr(self._ts, a, v))
             tags_layout.addWidget(cb)
@@ -363,12 +363,12 @@ class ToolSettingsPanel(QWidget):
         layout = QVBoxLayout(panel)
         layout.addWidget(QLabel(tr("subsettings-file-types")))
 
-        for attr, label in [
-            ("broken_audio", "Audio"), ("broken_pdf", "PDF"),
-            ("broken_archive", "Archive"), ("broken_image", "Image"),
-            ("broken_video", "Video"),
+        for attr, ftl_key in [
+            ("broken_audio", "subsettings-broken-audio"), ("broken_pdf", "subsettings-broken-pdf"),
+            ("broken_archive", "subsettings-broken-archive"), ("broken_image", "subsettings-broken-image"),
+            ("broken_video", "subsettings-broken-video"),
         ]:
-            cb = QCheckBox(label)
+            cb = QCheckBox(tr(ftl_key))
             cb.setChecked(getattr(self._ts, attr))
             cb.toggled.connect(lambda v, a=attr: setattr(self._ts, a, v))
             layout.addWidget(cb)
@@ -432,7 +432,7 @@ class ToolSettingsPanel(QWidget):
 
         # Mode
         self._vo_mode = QComboBox()
-        self._vo_mode.addItems(["Crop", "Transcode"])
+        self._vo_mode.addItems([tr("subsettings-vo-crop"), tr("subsettings-vo-transcode")])
         self._vo_mode.setCurrentIndex(0 if self._ts.video_opt_mode == "crop" else 1)
         self._vo_mode.currentIndexChanged.connect(self._on_vo_mode_changed)
         layout.addRow(tr("subsettings-mode"), self._vo_mode)
@@ -442,7 +442,7 @@ class ToolSettingsPanel(QWidget):
         crop_layout = QFormLayout(self._crop_group)
 
         self._vo_crop_type = QComboBox()
-        self._vo_crop_type.addItems(["Black Bars", "Static Content"])
+        self._vo_crop_type.addItems([tr("subsettings-crop-black-bars"), tr("subsettings-crop-static-content")])
         mechs = [VideoCropMechanism.BLACKBARS, VideoCropMechanism.STATICCONTENT]
         mech_idx = mechs.index(self._ts.video_crop_mechanism) if self._ts.video_crop_mechanism in mechs else 0
         self._vo_crop_type.setCurrentIndex(mech_idx)

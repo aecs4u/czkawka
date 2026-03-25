@@ -2,8 +2,6 @@
 
 **Krokiet** ((IPA: [ˈkrɔcɛt]), "croquette" in Polish) new generation GUI frontend, simple, multiplatform, fast and free app to remove unnecessary files from your computer.
 
-**Kalka** - Qt/PySide6 GUI frontend for Czkawka Core, offering a modern Python-based desktop interface.
-
 <div align="center"><img src="https://user-images.githubusercontent.com/41945903/102616149-66490400-4137-11eb-9cd6-813b2b070834.png" alt="czkawka_logo" width="600" /></div>
 
 **Czkawka** (_tch•kav•ka_ (IPA: [ˈʧ̑kafka]), "hiccup" in Polish) older gtk4 GUI frontend, superseded by Krokiet, but still receiving bugfix updates.
@@ -11,6 +9,10 @@
 <div align="center"><img src="https://github.com/user-attachments/assets/ed6dfeea-a984-49e8-a621-8d6ae521c760" alt="cedinia_logo" width="600" /></div>
 
 **Cedinia** - experimental Android touch friendly GUI frontend for Czkawka Core, built with Slint.
+
+<div align="center"><img src="kalka/icons/kalka.png" alt="kalka_logo" width="300" /></div>
+
+**Kalka** - Qt/PySide6 GUI frontend for Czkawka Core, offering a modern Python-based desktop interface with dark theme support, scan profiles, side-by-side file comparison, and CSV/JSON export.
 
 ## Features
 
@@ -92,7 +94,7 @@ options to choose than other).
 |      Video optimizer      |      ✔      |        ✔         |                  |         |        |                   |             |
 |         Bad Names         |      ✔      |        ✔         |                  |    ✔    |        |                   |             |
 |     Portable version      |      ✔      |        ✔         |        ✔         |         |        |                   |      ✔      |
-|    Multiple languages     |      ✔      |                  |        ✔         |    ✔    |   ✔    |         ✔         |      ✔      |
+|    Multiple languages     |      ✔      |        ✔         |        ✔         |    ✔    |   ✔    |         ✔         |      ✔      |
 |       Cache support       |      ✔      |        ✔         |        ✔         |    ✔    |        |         ✔         |             |
 |   In active development   |     Yes     |       Yes        | Yes<sup>**</sup> | Yes***  |   No   |  No<sup>*</sup>   |     Yes     |
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QStatusBar, QMessageBox, QLabel, QApplication
+    QStatusBar, QMessageBox, QLabel, QApplication, QInputDialog
 )
 from PySide6.QtCore import Qt, QTimer, QStandardPaths
 from PySide6.QtGui import QPalette, QColor
@@ -147,6 +147,13 @@ class MainWindow(QMainWindow):
         self._action_buttons.rename_clicked.connect(self._rename_files)
         self._action_buttons.clean_exif_clicked.connect(self._clean_exif)
         self._action_buttons.optimize_video_clicked.connect(self._optimize_video)
+
+        # Hamburger menu
+        self._action_buttons.settings_clicked.connect(self._show_settings)
+        self._action_buttons.about_clicked.connect(self._show_about)
+        self._action_buttons.save_profile_clicked.connect(self._save_profile)
+        self._action_buttons.load_profile_clicked.connect(self._load_profile)
+        self._refresh_profile_menu()
 
         # Results view
         self._results_view.selection_changed.connect(
@@ -296,9 +303,7 @@ class MainWindow(QMainWindow):
                 checked, dialog.move_to_trash, dry_run=dry_run
             )
             self._status_label.setText(tr("status-deleted-dry-run", count=deleted) if dry_run else tr("status-deleted", count=deleted))
-            if errors:
-                self._bottom_panel.set_text("\n".join(errors))
-                self._bottom_panel.show_text()
+            self._show_errors(errors)
             # Refresh results - remove deleted entries (skip on dry run)
             if not dry_run:
                 self._refresh_after_action(checked)
@@ -323,9 +328,7 @@ class MainWindow(QMainWindow):
             action_key = "status-copied" if dialog.copy_mode else "status-moved"
             dry_key = action_key + "-dry-run" if dry_run else action_key
             self._status_label.setText(tr(dry_key, count=moved))
-            if errors:
-                self._bottom_panel.set_text("\n".join(errors))
-                self._bottom_panel.show_text()
+            self._show_errors(errors)
             if not dialog.copy_mode and not dry_run:
                 self._refresh_after_action(checked)
 
@@ -360,25 +363,29 @@ class MainWindow(QMainWindow):
         dialog.sort_requested.connect(self._results_view.sort_by_column)
         dialog.exec()
 
+    def _find_reference_file(self, checked: list) -> str | None:
+        """Find the first unchecked file in the same group as the checked entries."""
+        all_results = self._state.get_results()
+        group_id = checked[0].group_id
+        for r in all_results:
+            if r.group_id == group_id and not r.header_row and not r.checked:
+                return r.values.get("__full_path", "")
+        return None
+
+    def _show_errors(self, errors: list[str]):
+        """Display errors in the bottom panel if any."""
+        if errors:
+            self._bottom_panel.set_text("\n".join(errors))
+            self._bottom_panel.show_text()
+
     def _create_hardlinks(self):
         checked = self._results_view.get_checked_entries()
         if not checked:
             return
 
-        # Find the reference file (first unchecked in the same group)
-        all_results = self._state.get_results()
-        group_id = checked[0].group_id
-        reference = None
-        for r in all_results:
-            if r.group_id == group_id and not r.header_row and not r.checked:
-                reference = r.values.get("__full_path", "")
-                break
-
+        reference = self._find_reference_file(checked)
         if not reference:
-            QMessageBox.warning(
-                self, tr("no-reference-title"),
-                tr("no-reference-message")
-            )
+            QMessageBox.warning(self, tr("no-reference-title"), tr("no-reference-message"))
             return
 
         reply = QMessageBox.question(
@@ -389,28 +396,16 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             created, errors = FileOperations.create_hardlinks(checked, reference)
             self._status_label.setText(tr("status-hardlinks-created", count=created))
-            if errors:
-                self._bottom_panel.set_text("\n".join(errors))
-                self._bottom_panel.show_text()
+            self._show_errors(errors)
 
     def _create_symlinks(self):
         checked = self._results_view.get_checked_entries()
         if not checked:
             return
 
-        all_results = self._state.get_results()
-        group_id = checked[0].group_id
-        reference = None
-        for r in all_results:
-            if r.group_id == group_id and not r.header_row and not r.checked:
-                reference = r.values.get("__full_path", "")
-                break
-
+        reference = self._find_reference_file(checked)
         if not reference:
-            QMessageBox.warning(
-                self, tr("no-reference-title"),
-                tr("no-reference-message")
-            )
+            QMessageBox.warning(self, tr("no-reference-title"), tr("no-reference-message"))
             return
 
         reply = QMessageBox.question(
@@ -421,9 +416,7 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             created, errors = FileOperations.create_symlinks(checked, reference)
             self._status_label.setText(tr("status-symlinks-created", count=created))
-            if errors:
-                self._bottom_panel.set_text("\n".join(errors))
-                self._bottom_panel.show_text()
+            self._show_errors(errors)
 
     def _rename_files(self):
         checked = self._results_view.get_checked_entries()
@@ -434,19 +427,25 @@ class MainWindow(QMainWindow):
         if tab == ActiveTab.BAD_EXTENSIONS:
             dialog = RenameDialog(len(checked), "extensions", self)
             if dialog.exec() == RenameDialog.Accepted:
-                success, msg = FileOperations.fix_extensions(
+                self._status_label.setText(tr("status-fixing-extensions"))
+                FileOperations.fix_extensions_async(
                     self._state.settings.czkawka_cli_path,
-                    self._state.settings, self._state.tool_settings
+                    self._state.settings, self._state.tool_settings,
+                    lambda ok, msg: QTimer.singleShot(0, lambda: self._status_label.setText(
+                        tr("status-extensions-fixed") if ok else tr("status-error", message=msg)
+                    ))
                 )
-                self._status_label.setText(tr("status-extensions-fixed") if success else tr("status-error", message=msg))
         elif tab == ActiveTab.BAD_NAMES:
             dialog = RenameDialog(len(checked), "names", self)
             if dialog.exec() == RenameDialog.Accepted:
-                success, msg = FileOperations.fix_bad_names(
+                self._status_label.setText(tr("status-fixing-names"))
+                FileOperations.fix_bad_names_async(
                     self._state.settings.czkawka_cli_path,
-                    self._state.settings, self._state.tool_settings
+                    self._state.settings, self._state.tool_settings,
+                    lambda ok, msg: QTimer.singleShot(0, lambda: self._status_label.setText(
+                        tr("status-names-fixed") if ok else tr("status-error", message=msg)
+                    ))
                 )
-                self._status_label.setText(tr("status-names-fixed") if success else tr("status-error", message=msg))
 
     def _clean_exif(self):
         checked = self._results_view.get_checked_entries()
@@ -459,15 +458,24 @@ class MainWindow(QMainWindow):
             QMessageBox.Yes | QMessageBox.No
         )
         if reply == QMessageBox.Yes:
-            cleaned, errors = FileOperations.clean_exif(
+            self._status_label.setText(tr("status-cleaning-exif"))
+
+            def _on_exif_done(cleaned, errors):
+                QTimer.singleShot(0, lambda: self._on_exif_complete(cleaned, errors))
+
+            FileOperations.clean_exif_async(
                 self._state.settings.czkawka_cli_path,
                 checked,
-                self._state.tool_settings.exif_ignored_tags
+                self._state.tool_settings.exif_ignored_tags,
+                True,
+                _on_exif_done,
             )
-            self._status_label.setText(tr("status-exif-cleaned", count=cleaned))
-            if errors:
-                self._bottom_panel.set_text("\n".join(errors))
-                self._bottom_panel.show_text()
+
+    def _on_exif_complete(self, cleaned, errors):
+        self._status_label.setText(tr("status-exif-cleaned", count=cleaned))
+        if errors:
+            self._bottom_panel.set_text("\n".join(errors))
+            self._bottom_panel.show_text()
 
     def _optimize_video(self):
         checked = self._results_view.get_checked_entries()
@@ -514,6 +522,24 @@ class MainWindow(QMainWindow):
         self._action_buttons.set_has_results(
             any(not r.header_row for r in cleaned)
         )
+
+    def _save_profile(self):
+        name, ok = QInputDialog.getText(
+            self, tr("save-profile-title"), tr("save-profile-prompt")
+        )
+        if ok and name.strip():
+            self._state.save_profile(name.strip())
+            self._refresh_profile_menu()
+            self._status_label.setText(tr("status-profile-saved", name=name.strip()))
+
+    def _load_profile(self, name: str):
+        if self._state.load_profile(name):
+            self._on_tab_changed(self._state.active_tab)
+            self._bottom_panel.refresh_lists()
+            self._status_label.setText(tr("status-profile-loaded", name=name))
+
+    def _refresh_profile_menu(self):
+        self._action_buttons.update_profiles(self._state.list_profiles())
 
     def _on_settings_changed(self):
         self._state.save_settings()

@@ -92,6 +92,7 @@ class AppState(QObject):
             "dark_theme": self.settings.dark_theme,
             "show_image_preview": self.settings.show_image_preview,
             "czkawka_cli_path": self.settings.czkawka_cli_path,
+            "language": self.settings.language,
         }
         try:
             config_file.write_text(json.dumps(data, indent=2))
@@ -120,6 +121,7 @@ class AppState(QObject):
                 s.dark_theme = data.get("dark_theme", s.dark_theme)
                 s.show_image_preview = data.get("show_image_preview", s.show_image_preview)
                 s.czkawka_cli_path = data.get("czkawka_cli_path", s.czkawka_cli_path)
+                s.language = data.get("language", s.language)
             except (json.JSONDecodeError, OSError):
                 pass
 

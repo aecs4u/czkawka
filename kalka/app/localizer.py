@@ -18,6 +18,34 @@ _FALLBACK_LOCALE = "en"
 # Available locales (directories under i18n/ that contain kalka.ftl)
 AVAILABLE_LOCALES: list[str] = []
 
+# Human-readable display names for locales (matching krokiet's LANGUAGE_LIST)
+LOCALE_DISPLAY_NAMES: dict[str, str] = {
+    "ar": "العربية (Arabic)",
+    "bg": "Български (Bulgarian)",
+    "cs": "Česky (Czech)",
+    "de": "Deutsch (German)",
+    "el": "Ελληνικά (Greek)",
+    "en": "English",
+    "es-ES": "Español (Spanish)",
+    "fa": "فارسی (Farsi)",
+    "fr": "Français (French)",
+    "it": "Italiano (Italian)",
+    "ja": "日本語 (Japanese)",
+    "ko": "한국어 (Korean)",
+    "nl": "Nederlands (Dutch)",
+    "no": "Norsk (Norwegian)",
+    "pl": "Polski (Polish)",
+    "pt-BR": "Português Brasil (Brazilian Portuguese)",
+    "pt-PT": "Português (Portuguese)",
+    "ro": "Română (Romanian)",
+    "ru": "Русский (Russian)",
+    "sv-SE": "Svenska (Swedish)",
+    "tr": "Türkçe (Turkish)",
+    "uk": "Українська (Ukrainian)",
+    "zh-CN": "简体中文 (Simplified Chinese)",
+    "zh-TW": "繁體中文 (Traditional Chinese)",
+}
+
 # Active localization instance
 _l10n: FluentLocalization | None = None
 

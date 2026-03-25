@@ -37,8 +37,8 @@ class LeftPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumWidth(170)
-        self.setMaximumWidth(230)
+        self.setMinimumWidth(220)
+        self.setMaximumWidth(280)
         self._setup_ui()
 
     def _setup_ui(self):
@@ -51,7 +51,7 @@ class LeftPanel(QWidget):
         if logo_path:
             self._logo_label = QLabel()
             pixmap = QPixmap(logo_path)
-            scaled = pixmap.scaledToHeight(70, Qt.SmoothTransformation)
+            scaled = pixmap.scaledToHeight(210, Qt.SmoothTransformation)
             self._logo_label.setPixmap(scaled)
             self._logo_label.setAlignment(Qt.AlignCenter)
             self._logo_label.setCursor(Qt.PointingHandCursor)

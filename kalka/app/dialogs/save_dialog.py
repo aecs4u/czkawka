@@ -3,6 +3,8 @@ import io
 import json
 from pathlib import Path
 
+from ..utils import format_size as _format_size
+
 from PySide6.QtWidgets import QFileDialog
 
 from ..localizer import tr
@@ -193,13 +195,3 @@ def _parse_cli_json(data: dict) -> list[ResultEntry] | None:
     return results if results else None
 
 
-def _format_size(size_bytes: int) -> str:
-    if size_bytes == 0:
-        return "0 B"
-    units = ["B", "KB", "MB", "GB", "TB"]
-    i = 0
-    size = float(size_bytes)
-    while size >= 1024 and i < len(units) - 1:
-        size /= 1024
-        i += 1
-    return f"{size:.1f} {units[i]}" if i > 0 else f"{int(size)} B"

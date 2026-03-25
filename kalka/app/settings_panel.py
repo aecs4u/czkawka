@@ -2,12 +2,12 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox,
     QLineEdit, QSpinBox, QGroupBox, QFormLayout, QScrollArea,
     QPushButton, QListWidget, QFileDialog, QDoubleSpinBox,
-    QTabWidget, QSizePolicy
+    QTabWidget, QSizePolicy, QComboBox
 )
 from PySide6.QtCore import Qt, Signal
 
 from .models import AppSettings
-from .localizer import tr
+from .localizer import tr, AVAILABLE_LOCALES, LOCALE_DISPLAY_NAMES, get_current_locale
 
 
 class SettingsPanel(QWidget):
@@ -56,6 +56,26 @@ class SettingsPanel(QWidget):
         scroll.setWidgetResizable(True)
         widget = QWidget()
         layout = QFormLayout(widget)
+
+        # Language
+        self._language_combo = QComboBox()
+        self._language_combo.addItem(tr("settings-language-auto"), "")
+        current = self._settings.language or ""
+        current_idx = 0
+        for i, loc in enumerate(AVAILABLE_LOCALES):
+            display = LOCALE_DISPLAY_NAMES.get(loc, loc)
+            self._language_combo.addItem(display, loc)
+            if loc == current:
+                current_idx = i + 1  # +1 for the "Auto" entry
+        self._language_combo.setCurrentIndex(current_idx)
+        self._language_combo.currentIndexChanged.connect(self._on_language_changed)
+        lang_layout = QHBoxLayout()
+        lang_layout.addWidget(self._language_combo)
+        self._lang_restart_label = QLabel(tr("settings-language-restart"))
+        self._lang_restart_label.setStyleSheet("color: gray; font-style: italic;")
+        lang_layout.addWidget(self._lang_restart_label)
+        lang_layout.addStretch()
+        layout.addRow(tr("settings-language"), lang_layout)
 
         # CLI path
         cli_layout = QHBoxLayout()
@@ -112,9 +132,9 @@ class SettingsPanel(QWidget):
         layout.addRow(hardlinks)
 
         # Low priority scanning
-        low_priority = QCheckBox("Low priority scanning (nice/ionice)")
+        low_priority = QCheckBox(tr("settings-low-priority"))
         low_priority.setChecked(self._settings.low_priority_scan)
-        low_priority.setToolTip("Run scans with idle CPU and I/O priority so they don't slow down other applications")
+        low_priority.setToolTip(tr("settings-low-priority-tooltip"))
         low_priority.toggled.connect(
             lambda v: setattr(self._settings, 'low_priority_scan', v)
         )
@@ -236,6 +256,11 @@ class SettingsPanel(QWidget):
 
         layout.addStretch()
         return widget
+
+    def _on_language_changed(self, index: int):
+        locale_code = self._language_combo.itemData(index)
+        self._settings.language = locale_code
+        self.settings_changed.emit()
 
     def _browse_cli(self):
         path, _ = QFileDialog.getOpenFileName(

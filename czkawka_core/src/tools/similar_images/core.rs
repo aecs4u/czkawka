@@ -192,7 +192,11 @@ impl SimilarImages {
                 let mut has_referenced = false;
                 let mut has_normal = false;
                 for file_entry in vec_file_entry {
-                    if is_in_reference_folder(&self.common_data.directories.reference_directories, &self.common_data.directories.reference_files, &file_entry.path) {
+                    if is_in_reference_folder(
+                        &self.common_data.directories.reference_directories,
+                        &self.common_data.directories.reference_files,
+                        &file_entry.path,
+                    ) {
                         has_referenced = true;
                     } else {
                         has_normal = true;
@@ -443,7 +447,8 @@ impl SimilarImages {
                     collected_similar_images.insert(hash, vec_file_entry);
                 }
             }
-        } else if self.compare_hashes_with_non_zero_tolerance(&mut all_hashed_images, &mut collected_similar_images, progress_sender, stop_flag, tolerance) == WorkContinueStatus::Stop
+        } else if self.compare_hashes_with_non_zero_tolerance(&mut all_hashed_images, &mut collected_similar_images, progress_sender, stop_flag, tolerance)
+            == WorkContinueStatus::Stop
         {
             return WorkContinueStatus::Stop;
         }

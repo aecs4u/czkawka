@@ -26,6 +26,9 @@ about-description =
     Licensed under MIT License
     https://github.com/qarmin/czkawka
 about-logo-tooltip = About Kalka
+about-tab-about = About
+about-tab-credits = Credits
+about-tab-license = License
 version-label = Kalka v11.0.1
 
 # ── Status bar ────────────────────────────────────────────
@@ -130,8 +133,13 @@ settings-recursive = Recursive search
 settings-use-cache = Use cache for faster rescans
 settings-move-to-trash = Move to trash instead of permanent delete
 settings-hide-hard-links = Hide hard links
+settings-language = Language:
+settings-language-auto = System default
+settings-language-restart = (restart required)
 settings-save-as-json = Save results as JSON (instead of text)
 settings-select-cli-binary = Select czkawka_cli binary
+settings-low-priority = Low priority scanning (nice/ionice)
+settings-low-priority-tooltip = Run scans with idle CPU and I/O priority so they don't slow down other applications
 
 # Directories settings
 settings-included-dirs = Included Directories
@@ -247,6 +255,16 @@ preview-file-not-found = File not found
 preview-not-available = Preview not available
     for this file type
 preview-cannot-load = Cannot load image
+preview-loading = Loading...
+preview-video-unavailable = Video preview
+    (ffmpeg not available)
+preview-pdf-unavailable = PDF preview
+    (PySide6.QtPdf not available)
+preview-read-error = Error reading file.
+preview-comparison = Comparison
+status-cleaning-exif = Cleaning EXIF data...
+status-fixing-extensions = Fixing extensions...
+status-fixing-names = Fixing names...
 
 # ── Context menu ─────────────────────────────────────────
 context-open-file = Open File
@@ -336,3 +354,47 @@ scan-error-title = Scan Error
 # ── Save/load dialogs ────────────────────────────────────
 save-dialog-title = Save Results
 load-dialog-title = Load Results
+
+# ── Hamburger menu ──────────────────────────────────────
+menu-profiles = Profiles
+menu-save-profile = Save Current Profile...
+menu-settings = Settings
+menu-about = About
+
+# ── Profiles ────────────────────────────────────────────
+save-profile-title = Save Profile
+save-profile-prompt = Enter a name for this profile:
+status-profile-saved = Profile "{ $name }" saved.
+status-profile-loaded = Profile "{ $name }" loaded.
+
+# ── Select dialog ──────────────────────────────────────
+select-quick-group = Quick selection
+select-smart-group = Smart selection (combinable)
+select-smart-help =
+    Check multiple criteria to combine them.
+    AND = file must match ALL checked criteria.
+    OR = file must match ANY checked criterion.
+select-combine-with = Combine with:
+select-combine-and = AND (all must match)
+select-combine-or = OR (any must match)
+select-apply-combined = Apply combined selection
+
+# ── Tool settings labels ───────────────────────────────
+subsettings-name-similarity = Name similarity
+subsettings-music-tags = Tags
+subsettings-music-fingerprint = Fingerprint
+subsettings-music-title = Title
+subsettings-music-artist = Artist
+subsettings-music-bitrate = Bitrate
+subsettings-music-genre = Genre
+subsettings-music-year = Year
+subsettings-music-length = Length
+subsettings-broken-audio = Audio
+subsettings-broken-pdf = PDF
+subsettings-broken-archive = Archive
+subsettings-broken-image = Image
+subsettings-broken-video = Video
+subsettings-vo-crop = Crop
+subsettings-vo-transcode = Transcode
+subsettings-crop-black-bars = Black Bars
+subsettings-crop-static-content = Static Content

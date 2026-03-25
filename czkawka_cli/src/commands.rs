@@ -1130,6 +1130,9 @@ impl FileToSave {
             None => None,
         }
     }
+    pub(crate) fn is_specified(&self) -> bool {
+        self.file_to_save.is_some()
+    }
 }
 impl JsonCompactFileToSave {
     pub(crate) fn file_name(&self) -> Option<&str> {
@@ -1144,6 +1147,9 @@ impl JsonCompactFileToSave {
             None => None,
         }
     }
+    pub(crate) fn is_specified(&self) -> bool {
+        self.compact_file_to_save.is_some()
+    }
 }
 impl JsonPrettyFileToSave {
     pub(crate) fn file_name(&self) -> Option<&str> {
@@ -1157,6 +1163,9 @@ impl JsonPrettyFileToSave {
             },
             None => None,
         }
+    }
+    pub(crate) fn is_specified(&self) -> bool {
+        self.pretty_file_to_save.is_some()
     }
 }
 

@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QPushButton, QSizePolicy
+    QWidget, QHBoxLayout, QPushButton, QSizePolicy, QMenu, QToolButton
 )
 from PySide6.QtCore import Signal, QSize
 
@@ -7,9 +7,18 @@ from .models import ActiveTab, GROUPED_TABS
 from .icons import (
     icon_search, icon_stop, icon_select, icon_delete, icon_move,
     icon_save, icon_sort, icon_hardlink, icon_symlink, icon_rename,
-    icon_clean, icon_optimize,
+    icon_clean, icon_optimize, icon_dir,
 )
 from .localizer import tr
+
+
+def _make_btn(icon_fn, label_key: str, signal, layout) -> QPushButton:
+    """Create and register an icon button with standard sizing."""
+    btn = QPushButton(icon_fn(18), " " + tr(label_key))
+    btn.setIconSize(ICON_SIZE)
+    btn.clicked.connect(signal.emit)
+    layout.addWidget(btn)
+    return btn
 
 ICON_SIZE = QSize(18, 18)
 
@@ -30,6 +39,11 @@ class ActionButtons(QWidget):
     rename_clicked = Signal()
     clean_exif_clicked = Signal()
     optimize_video_clicked = Signal()
+    # Hamburger menu signals
+    settings_clicked = Signal()
+    about_clicked = Signal()
+    save_profile_clicked = Signal()
+    load_profile_clicked = Signal(str)  # profile name
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -44,96 +58,48 @@ class ActionButtons(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        # Scan button
-        self._scan_btn = QPushButton(icon_search(18), " " + tr("scan-button"))
-        self._scan_btn.setIconSize(ICON_SIZE)
+        self._scan_btn = _make_btn(icon_search, "scan-button", self.scan_clicked, layout)
         self._scan_btn.setMinimumWidth(90)
-        self._scan_btn.clicked.connect(self.scan_clicked.emit)
-        layout.addWidget(self._scan_btn)
 
-        # Stop button
-        self._stop_btn = QPushButton(icon_stop(18), " " + tr("stop-button"))
-        self._stop_btn.setIconSize(ICON_SIZE)
+        self._stop_btn = _make_btn(icon_stop, "stop-button", self.stop_clicked, layout)
         self._stop_btn.setMinimumWidth(80)
-        self._stop_btn.clicked.connect(self.stop_clicked.emit)
         self._stop_btn.setVisible(False)
-        layout.addWidget(self._stop_btn)
 
-        # Spacer
         spacer = QWidget()
         spacer.setFixedWidth(10)
         layout.addWidget(spacer)
 
-        # Select button
-        self._select_btn = QPushButton(icon_select(18), " " + tr("select-button"))
-        self._select_btn.setIconSize(ICON_SIZE)
-        self._select_btn.clicked.connect(self.select_clicked.emit)
-        layout.addWidget(self._select_btn)
+        self._select_btn = _make_btn(icon_select, "select-button", self.select_clicked, layout)
+        self._delete_btn = _make_btn(icon_delete, "delete-button", self.delete_clicked, layout)
+        self._move_btn = _make_btn(icon_move, "move-button", self.move_clicked, layout)
+        self._save_btn = _make_btn(icon_save, "save-button", self.save_clicked, layout)
 
-        # Delete button
-        self._delete_btn = QPushButton(icon_delete(18), " " + tr("delete-button"))
-        self._delete_btn.setIconSize(ICON_SIZE)
-        self._delete_btn.clicked.connect(self.delete_clicked.emit)
-        layout.addWidget(self._delete_btn)
-
-        # Move button
-        self._move_btn = QPushButton(icon_move(18), " " + tr("move-button"))
-        self._move_btn.setIconSize(ICON_SIZE)
-        self._move_btn.clicked.connect(self.move_clicked.emit)
-        layout.addWidget(self._move_btn)
-
-        # Save button
-        self._save_btn = QPushButton(icon_save(18), " " + tr("save-button"))
-        self._save_btn.setIconSize(ICON_SIZE)
-        self._save_btn.clicked.connect(self.save_clicked.emit)
-        layout.addWidget(self._save_btn)
-
-        # Load button
-        from .icons import icon_dir
-        self._load_btn = QPushButton(icon_dir(18), " " + tr("load-button"))
-        self._load_btn.setIconSize(ICON_SIZE)
+        self._load_btn = _make_btn(icon_dir, "load-button", self.load_clicked, layout)
         self._load_btn.setToolTip(tr("load-button-tooltip"))
-        self._load_btn.clicked.connect(self.load_clicked.emit)
-        layout.addWidget(self._load_btn)
 
-        # Sort button
-        self._sort_btn = QPushButton(icon_sort(18), " " + tr("sort-button"))
-        self._sort_btn.setIconSize(ICON_SIZE)
-        self._sort_btn.clicked.connect(self.sort_clicked.emit)
-        layout.addWidget(self._sort_btn)
-
-        # Hardlink button (grouped tools only)
-        self._hardlink_btn = QPushButton(icon_hardlink(18), " " + tr("hardlink-button"))
-        self._hardlink_btn.setIconSize(ICON_SIZE)
-        self._hardlink_btn.clicked.connect(self.hardlink_clicked.emit)
-        layout.addWidget(self._hardlink_btn)
-
-        # Symlink button (grouped tools only)
-        self._symlink_btn = QPushButton(icon_symlink(18), " " + tr("symlink-button"))
-        self._symlink_btn.setIconSize(ICON_SIZE)
-        self._symlink_btn.clicked.connect(self.symlink_clicked.emit)
-        layout.addWidget(self._symlink_btn)
-
-        # Rename button (bad extensions / bad names)
-        self._rename_btn = QPushButton(icon_rename(18), " " + tr("rename-button"))
-        self._rename_btn.setIconSize(ICON_SIZE)
-        self._rename_btn.clicked.connect(self.rename_clicked.emit)
-        layout.addWidget(self._rename_btn)
-
-        # Clean EXIF button
-        self._clean_exif_btn = QPushButton(icon_clean(18), " " + tr("clean-exif-button"))
-        self._clean_exif_btn.setIconSize(ICON_SIZE)
-        self._clean_exif_btn.clicked.connect(self.clean_exif_clicked.emit)
-        layout.addWidget(self._clean_exif_btn)
-
-        # Optimize Video button
-        self._optimize_btn = QPushButton(icon_optimize(18), " " + tr("optimize-button"))
-        self._optimize_btn.setIconSize(ICON_SIZE)
-        self._optimize_btn.clicked.connect(self.optimize_video_clicked.emit)
-        layout.addWidget(self._optimize_btn)
+        self._sort_btn = _make_btn(icon_sort, "sort-button", self.sort_clicked, layout)
+        self._hardlink_btn = _make_btn(icon_hardlink, "hardlink-button", self.hardlink_clicked, layout)
+        self._symlink_btn = _make_btn(icon_symlink, "symlink-button", self.symlink_clicked, layout)
+        self._rename_btn = _make_btn(icon_rename, "rename-button", self.rename_clicked, layout)
+        self._clean_exif_btn = _make_btn(icon_clean, "clean-exif-button", self.clean_exif_clicked, layout)
+        self._optimize_btn = _make_btn(icon_optimize, "optimize-button", self.optimize_video_clicked, layout)
 
         # Stretch at the end
         layout.addStretch()
+
+        # Hamburger menu button
+        self._hamburger_btn = QToolButton()
+        self._hamburger_btn.setText("\u2630")  # trigram for heaven (hamburger icon)
+        self._hamburger_btn.setFixedSize(32, 32)
+        self._hamburger_btn.setPopupMode(QToolButton.InstantPopup)
+        self._hamburger_btn.setStyleSheet(
+            "QToolButton { font-size: 18px; border: none; }"
+            "QToolButton::menu-indicator { image: none; }"
+        )
+        self._hamburger_menu = QMenu(self)
+        self._hamburger_btn.setMenu(self._hamburger_menu)
+        self._build_hamburger_menu()
+        layout.addWidget(self._hamburger_btn)
 
         self._update_visibility()
 
@@ -190,3 +156,30 @@ class ActionButtons(QWidget):
         self._rename_btn.setEnabled(has_sel)
         self._clean_exif_btn.setEnabled(has_sel)
         self._optimize_btn.setEnabled(has_sel)
+
+    def _build_hamburger_menu(self):
+        m = self._hamburger_menu
+        m.clear()
+
+        # Profiles submenu
+        self._profiles_menu = m.addMenu(tr("menu-profiles"))
+        self._profiles_menu.addAction(tr("menu-save-profile"), self.save_profile_clicked.emit)
+        self._profiles_menu.addSeparator()
+        # Populated dynamically via update_profiles()
+
+        m.addSeparator()
+        m.addAction(tr("menu-settings"), self.settings_clicked.emit)
+        m.addAction(tr("menu-about"), self.about_clicked.emit)
+
+    def update_profiles(self, profile_names: list[str]):
+        """Refresh the load-profile submenu with current profile names."""
+        # Remove old dynamic actions (after the separator)
+        actions = self._profiles_menu.actions()
+        # Keep first action (Save) and separator
+        for action in actions[2:]:
+            self._profiles_menu.removeAction(action)
+        if profile_names:
+            for name in profile_names:
+                self._profiles_menu.addAction(
+                    name, lambda n=name: self.load_profile_clicked.emit(n)
+                )
