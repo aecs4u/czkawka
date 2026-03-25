@@ -48,7 +48,7 @@ impl DuplicateFinder {
             |fe: &FileEntry| {
                 fe.path
                     .file_name()
-                    .unwrap_or_else(|| panic!("Found invalid file_name \"{}\" (cannot panic, because it is always normal file)", fe.path.to_string_lossy()))
+                    .unwrap_or(std::ffi::OsStr::new(""))
                     .to_string_lossy()
                     .to_string()
             }
@@ -56,7 +56,7 @@ impl DuplicateFinder {
             |fe: &FileEntry| {
                 fe.path
                     .file_name()
-                    .unwrap_or_else(|| panic!("Found invalid file_name \"{}\" (cannot panic, because it is always normal file)", fe.path.to_string_lossy()))
+                    .unwrap_or(std::ffi::OsStr::new(""))
                     .to_string_lossy()
                     .to_lowercase()
             }
@@ -151,7 +151,7 @@ impl DuplicateFinder {
                             let name = fe
                                 .path
                                 .file_stem()
-                                .unwrap_or_else(|| panic!("Found invalid file_stem \"{}\"", fe.path.to_string_lossy()))
+                                .unwrap_or(std::ffi::OsStr::new(""))
                                 .to_string_lossy();
                             if case_sensitive { name.to_string() } else { name.to_lowercase() }
                         })
