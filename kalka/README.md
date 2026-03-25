@@ -1,46 +1,76 @@
 # Kalka
 
-A Qt 6 / PySide6 GUI frontend for Czkawka, with feature parity with the Krokiet (Slint) interface.
+<div align="center">
+<img src="icons/kalka.png" alt="Kalka logo" width="200" />
 
-This frontend uses `czkawka_cli` as its backend, communicating via JSON output for results and `--json-progress` for real-time progress data.
+**A modern Qt 6 / PySide6 desktop frontend for [Czkawka](https://github.com/qarmin/czkawka)**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
+[![PySide6](https://img.shields.io/badge/PySide6-6.6+-orange.svg)](https://pypi.org/project/PySide6/)
+</div>
+
+---
+
+Kalka uses `czkawka_cli` as its backend, communicating via JSON output for results and `--json-progress` for real-time progress data. It follows the [KDE Plasma Human Interface Guidelines](https://develop.kde.org/hig/) for spacing, icons, and theme integration.
+
+## Screenshots
+
+> **Note:** To add screenshots, place PNG files in `kalka/screenshots/` and uncomment the lines below.
+
+<!--
+<div align="center">
+
+| Duplicate scan | Similar images | Settings |
+|:-:|:-:|:-:|
+| ![Duplicates](screenshots/duplicates.png) | ![Similar images](screenshots/similar-images.png) | ![Settings](screenshots/settings.png) |
+
+| Side-by-side preview | Dark theme |
+|:-:|:-:|
+| ![Comparison](screenshots/comparison.png) | ![Dark](screenshots/dark-theme.png) |
+
+</div>
+-->
 
 ## Features
 
-All 14 scanning tools are supported:
+### 14 Scanning Tools
 
-- Duplicate Files (by hash, size, name, or size+name)
-- Empty Folders / Empty Files
-- Big Files (biggest or smallest)
-- Temporary Files
-- Similar Images (with configurable hash algorithm, size, similarity)
-- Similar Videos (with crop detection, skip forward, duration)
-- Similar Music (by tags or audio fingerprint)
-- Invalid Symlinks
-- Broken Files (audio, PDF, archive, image, video)
-- Bad Extensions
-- Bad Names (uppercase, emoji, spaces, non-ASCII, restricted charset)
-- EXIF Remover
-- Video Optimizer (crop black bars / transcode)
+| Tool | Description |
+|------|-------------|
+| Duplicate Files | By hash (BLAKE3/CRC32/XXH3), size, name, fuzzy name, or size+name |
+| Empty Folders / Files | Find and remove empty entries |
+| Big Files | Find biggest or smallest files |
+| Temporary Files | Detect common temporary file patterns |
+| Similar Images | Configurable hash algorithm, size, and similarity threshold |
+| Similar Videos | With crop detection, skip forward, and duration parameters |
+| Similar Music | By tags (with fuzzy Jaro-Winkler matching) or audio fingerprint |
+| Similar Documents | MinHash shingling for near-duplicate text detection |
+| Invalid Symlinks | Detect broken symbolic links |
+| Broken Files | Validate audio, PDF, archive, image, and video files |
+| Bad Extensions | Find files whose content doesn't match their extension |
+| Bad Names | Detect uppercase extensions, emoji, spaces, non-ASCII characters |
+| EXIF Remover | Strip metadata from images |
+| Video Optimizer | Crop black bars or transcode to efficient formats |
 
-### GUI features
+### GUI Features
 
-- **Dark theme** with full Qt stylesheet
-- **Two-bar progress display** - current stage + overall progress, matching the Slint frontend
-  - Real-time entry and byte counts (e.g., "Calculating hashes: 15,000/25,000 (500 MB/1 GB)")
-  - File collection estimation using cached counts from previous scans
-  - Elapsed time display
-  - Stage step indicators
-- **Project icons** - uses the same SVG icons as the Krokiet interface
-- **Image preview panel** for duplicate/similar image results
-- **Grouped results view** with tree display for duplicate/similar file groups
-- **Selection modes** - Select All/None, Invert, Biggest/Smallest, Newest/Oldest, Shortest/Longest Path
-- **File actions** - Delete (with trash support), Move/Copy, Hardlink, Symlink, Rename, Clean EXIF
-- **Per-tool settings** - all tool-specific options (hash type, similarity thresholds, etc.)
-- **Global settings** - directories, filters, cache, thread count
-- **Directory management** - included/excluded paths with add/remove buttons
-- **Context menus** - right-click to open file or containing folder
-- **Settings persistence** via JSON config files
-- **Auto-detection** of `czkawka_cli` binary (checks PATH, cargo target directory, cargo metadata)
+- **KDE Plasma HIG compliant** — Kirigami spacing, FreeDesktop theme icons with SVG fallback, live dark/light theme switching
+- **Two-bar progress display** — current stage + overall progress with percentage, entry/byte counts, and elapsed time
+- **Side-by-side file comparison** — split preview for images, text diff, PDF, and video thumbnails
+- **Async preview loading** — images, videos, and PDFs load in background threads
+- **Scan profiles** — save and load named scan configurations
+- **CSV/JSON/text export** — export results in standard formats
+- **Hamburger menu** — profiles, settings, and about with credits/license tabs
+- **Grouped results view** — tree display with sortable columns and context menus
+- **Smart selection** — combine criteria with AND/OR logic (biggest + newest, etc.)
+- **File actions** — delete (trash/permanent), move/copy, hardlink, symlink, rename
+- **Per-tool settings** — all tool-specific options in collapsible panels
+- **Drag & drop** — drop folders onto the directory panel
+- **Idle-priority scanning** — nice/ionice support for background scans
+- **No-self-compare mode** — compare across directories without intra-directory matches
+- **Internationalization** — Fluent i18n with 26+ language translations
+- **Accessibility** — keyboard navigation, screen reader labels, DPI-aware sizing
 
 ## Requirements
 
@@ -49,67 +79,59 @@ All 14 scanning tools are supported:
 - `czkawka_cli` binary (installed or in PATH)
 - Optional: `send2trash` (for trash support on Linux)
 - Optional: `Pillow` (for EXIF cleaning fallback)
+- Optional: `fluent.runtime` (for i18n support)
 
-## Installation
-
-### 1. Install czkawka_cli
+## Quick Start
 
 ```shell
-# From the project root
-cargo install --path czkawka_cli
-
-# Or build it
+# 1. Build the CLI backend
 cargo build --release -p czkawka_cli
-```
 
-### 2. Install Python dependencies
-
-```shell
+# 2. Install Python dependencies
 cd kalka
 pip install -r requirements.txt
-```
 
-### 3. Run
-
-```shell
+# 3. Run
 python main.py
 ```
 
-The application will auto-detect the `czkawka_cli` binary. If it can't find it, configure the path in Settings.
+The application auto-detects the `czkawka_cli` binary from PATH or the cargo target directory. Configure the path manually in Settings if needed.
 
 ## Architecture
 
 ```
 kalka/
-├── main.py                    # Entry point
+├── main.py                    # Entry point (i18n init, QApplication)
 ├── requirements.txt           # Python dependencies
+├── i18n/                      # Fluent translation files (26+ languages)
+├── icons/                     # App logo and SVG icons
 ├── app/
-│   ├── main_window.py         # Main window with all panels
-│   ├── left_panel.py          # Tool selection sidebar (14 tools)
-│   ├── results_view.py        # Results tree with grouping, selection, sorting
-│   ├── action_buttons.py      # Scan/Stop/Delete/Move/Save/Sort buttons with icons
-│   ├── tool_settings.py       # Per-tool settings (9 tool panels)
-│   ├── settings_panel.py      # Global settings (General/Directories/Filters/Preview)
-│   ├── progress_widget.py     # Two-bar progress: current stage + overall
-│   ├── preview_panel.py       # Image preview panel
-│   ├── bottom_panel.py        # Directory management + error display
-│   ├── backend.py             # CLI subprocess interface with JSON progress parsing
-│   ├── models.py              # Data models, enums, column definitions
-│   ├── state.py               # Application state with Qt signals
-│   ├── icons.py               # SVG icon resources from Krokiet icon set
+│   ├── main_window.py         # Main window orchestration
+│   ├── backend.py             # CLI subprocess + async file operations
+│   ├── state.py               # Central AppState with signals + profiles
+│   ├── models.py              # Enums, dataclasses, column definitions
+│   ├── utils.py               # KDE HIG constants, DPI helpers, format_size
+│   ├── left_panel.py          # Tool selection sidebar
+│   ├── results_view.py        # Tree widget with batch insertion
+│   ├── action_buttons.py      # Toolbar with FreeDesktop theme icons
+│   ├── tool_settings.py       # Per-tool settings panels
+│   ├── settings_panel.py      # Global settings (tabbed)
+│   ├── progress_widget.py     # Two-bar progress with background file counter
+│   ├── preview_panel.py       # Async image/video/PDF/text preview
+│   ├── bottom_panel.py        # Directory management + drag & drop
+│   ├── icons.py               # SVG icon resources with theme fallback
+│   ├── localizer.py           # Fluent i18n integration
 │   └── dialogs/               # Delete, Move, Select, Sort, Save, Rename, About
 ```
 
-### How it works
+### How It Works
 
-1. **Scanning**: The app spawns `czkawka_cli` as a subprocess with `--compact-file-to-save` for JSON results and `--json-progress` for real-time progress data on stderr.
+1. **Scanning** — spawns `czkawka_cli` with `--compact-file-to-save` for JSON results and `--json-progress` on stderr for real-time progress
+2. **Progress** — JSON lines on stderr are parsed into `ScanProgress` and displayed as two progress bars (current stage + overall)
+3. **Results** — JSON results are parsed into `ResultEntry` objects and displayed in a tree view with group headers
+4. **File operations** — delete, move, hardlink, symlink run directly in Python; EXIF cleaning and extension/name fixing use async CLI subcommands
+5. **Theme** — inherits system palette (Breeze, Adwaita, etc.) with no hardcoded colors; `paletteChanged` signal enables live theme switching
 
-2. **Progress**: JSON lines on stderr provide `ProgressData` with stage index, entry counts, byte counts — the same data the Slint frontend gets via crossbeam channels. The progress widget displays two bars (current stage and overall) with percentage, counts, and elapsed time.
-
-3. **Results**: JSON results are parsed and displayed in a tree view with group headers for duplicate/similar file tools.
-
-4. **File operations**: Delete, move, hardlink, symlink, and rename operations are performed directly in Python. EXIF cleaning and extension/name fixing use `czkawka_cli` subcommands.
-
-## LICENSE
+## License
 
 MIT
