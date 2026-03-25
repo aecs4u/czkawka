@@ -143,6 +143,26 @@ impl Commands {
             Self::SimilarDocuments(a) => a.common_cli_items.json_progress,
         }
     }
+
+    pub fn tool_type_name(&self) -> &'static str {
+        match self {
+            Self::Duplicates(_) => "duplicates",
+            Self::EmptyFolders(_) => "empty_folders",
+            Self::BiggestFiles(_) => "big_files",
+            Self::EmptyFiles(_) => "empty_files",
+            Self::Temporary(_) => "temporary",
+            Self::SimilarImages(_) => "similar_images",
+            Self::SameMusic(_) => "similar_music",
+            Self::InvalidSymlinks(_) => "invalid_symlinks",
+            Self::BrokenFiles(_) => "broken_files",
+            Self::SimilarVideos(_) => "similar_videos",
+            Self::BadExtensions(_) => "bad_extensions",
+            Self::BadNames(_) => "bad_names",
+            Self::VideoOptimizer(_) => "video_optimizer",
+            Self::ExifRemover(_) => "exif_remover",
+            Self::SimilarDocuments(_) => "similar_documents",
+        }
+    }
 }
 
 #[derive(Debug, clap::Args)]
@@ -969,6 +989,14 @@ pub struct CommonCliItems {
                       entries_checked, entries_to_check, bytes_checked, bytes_to_check, tool_type."
     )]
     pub json_progress: bool,
+    #[clap(
+        long,
+        help = "Write JSON results envelope to stdout",
+        long_help = "Writes results as a JSON envelope to stdout with fields: \
+                      schema_version, tool_type, results, messages. \
+                      This provides a stable machine-readable contract for frontends."
+    )]
+    pub json_compact_stdout: bool,
 }
 
 #[derive(Debug, clap::Args, Clone, Copy)]

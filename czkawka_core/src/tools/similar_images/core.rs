@@ -463,6 +463,10 @@ impl SimilarImages {
         self.remove_multiple_records_from_reference_folders();
 
         if self.common_data.use_reference_folders {
+            Self::verify_referenced_items(&self.similar_referenced_vectors);
+        }
+
+        if self.common_data.use_reference_folders {
             for (_fe, vector) in &self.similar_referenced_vectors {
                 self.information.number_of_duplicates += vector.len();
                 self.information.number_of_groups += 1;
@@ -520,7 +524,6 @@ impl SimilarImages {
         }
     }
 
-    // TODO this probably not works good when reference folders are used
     pub(crate) fn verify_duplicated_items(collected_similar_images: &IndexMap<ImHash, Vec<ImagesEntry>>) {
         if !cfg!(debug_assertions) {
             return;
@@ -551,6 +554,38 @@ impl SimilarImages {
             }
         }
         assert!(!found, "Found Invalid entries, verify errors before");
+    }
+
+    pub(crate) fn verify_referenced_items(similar_referenced: &[(ImagesEntry, Vec<ImagesEntry>)]) {
+        if !cfg!(debug_assertions) {
+            return;
+        }
+        let mut result_hashset: IndexSet<String> = Default::default();
+        let mut found = false;
+
+        for (reference, normal_files) in similar_referenced {
+            if normal_files.is_empty() {
+                error!("Found reference group with no normal files: {reference:?}");
+                found = true;
+                continue;
+            }
+            let ref_path = reference.path.to_string_lossy().into_owned();
+            // Reference file may appear in multiple groups (it matches several
+            // non-reference files), so we only check normal_files for duplicates.
+            for file_entry in normal_files {
+                let st = file_entry.path.to_string_lossy().into_owned();
+                if st == ref_path {
+                    found = true;
+                    error!("Normal file same as reference: {st}");
+                } else if result_hashset.contains(&st) {
+                    found = true;
+                    error!("Duplicated non-reference element {st}");
+                } else {
+                    result_hashset.insert(st);
+                }
+            }
+        }
+        assert!(!found, "Found invalid entries in referenced results");
     }
 }
 

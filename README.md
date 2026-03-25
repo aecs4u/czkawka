@@ -10,7 +10,7 @@
 
 **Cedinia** - experimental Android touch friendly GUI frontend for Czkawka Core, built with Slint.
 
-<div align="center"><img src="kalka/icons/kalka.png" alt="kalka_logo" width="300" /></div>
+<div align="center"><img src="kalka/icons/kalka_logo_name_horizontal.png" alt="kalka_logo" width="600" /></div>
 
 **Kalka** - Qt/PySide6 GUI frontend for Czkawka Core, offering a modern Python-based desktop interface with dark theme support, scan profiles, side-by-side file comparison, and CSV/JSON export.
 

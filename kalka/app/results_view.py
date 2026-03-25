@@ -1,8 +1,10 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QHeaderView,
-    QAbstractItemView, QMenu, QLabel, QHBoxLayout
+    QWidget, QVBoxLayout, QTreeView, QHeaderView,
+    QAbstractItemView, QMenu, QLabel, QHBoxLayout, QStyledItemDelegate
 )
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import (
+    Signal, Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex
+)
 from PySide6.QtGui import QColor, QBrush, QFont, QAction
 
 from .models import (
@@ -12,16 +14,166 @@ from .utils import format_size as _format_size
 from .localizer import tr
 
 
+# ── Model ────────────────────────────────────────────────────
+
+
+class ResultsModel(QAbstractItemModel):
+    """Flat table model backed by a list of ResultEntry objects.
+
+    Each row maps 1:1 to a ResultEntry (headers included).
+    Column 0 is the checkbox column; columns 1..N hold display values.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._results: list[ResultEntry] = []
+        self._columns: list[str] = []
+        self._header_bg = QColor()
+        self._header_fg = QColor()
+
+    # ── public API ────────────────────────────────────────────
+
+    def set_columns(self, columns: list[str]):
+        self.beginResetModel()
+        self._columns = columns
+        self.endResetModel()
+
+    def set_results(self, results: list[ResultEntry]):
+        self.beginResetModel()
+        self._results = results
+        self.endResetModel()
+
+    def set_header_colors(self, bg: QColor, fg: QColor):
+        self._header_bg = bg
+        self._header_fg = fg
+
+    def get_entry(self, row: int) -> ResultEntry | None:
+        if 0 <= row < len(self._results):
+            return self._results[row]
+        return None
+
+    def get_results(self) -> list[ResultEntry]:
+        return self._results
+
+    def set_checked(self, row: int, checked: bool):
+        entry = self.get_entry(row)
+        if entry and not entry.header_row:
+            entry.checked = checked
+            idx = self.index(row, 0)
+            self.dataChanged.emit(idx, idx, [Qt.CheckStateRole])
+
+    def sort_results(self, results: list[ResultEntry]):
+        """Replace results with a pre-sorted list (sorting logic lives in ResultsView)."""
+        self.beginResetModel()
+        self._results = results
+        self.endResetModel()
+
+    # ── QAbstractItemModel interface ─────────────────────────
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0  # flat model
+        return len(self._results)
+
+    def columnCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return len(self._columns)
+
+    def index(self, row, column, parent=QModelIndex()):
+        if parent.isValid() or not self.hasIndex(row, column, parent):
+            return QModelIndex()
+        return self.createIndex(row, column)
+
+    def parent(self, index):
+        return QModelIndex()  # flat
+
+    def flags(self, index):
+        if not index.isValid():
+            return Qt.NoItemFlags
+        entry = self.get_entry(index.row())
+        if not entry:
+            return Qt.NoItemFlags
+        base = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        if not entry.header_row and index.column() == 0:
+            base |= Qt.ItemIsUserCheckable
+        return base
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        entry = self.get_entry(index.row())
+        if not entry:
+            return None
+        col = index.column()
+
+        if entry.header_row:
+            if role == Qt.DisplayRole and col == 0:
+                return entry.values.get("__header", "Group")
+            if role == Qt.FontRole:
+                f = QFont()
+                f.setBold(True)
+                return f
+            if role == Qt.BackgroundRole:
+                return QBrush(self._header_bg)
+            if role == Qt.ForegroundRole:
+                return QBrush(self._header_fg)
+            return None
+
+        if role == Qt.CheckStateRole and col == 0:
+            return Qt.Checked if entry.checked else Qt.Unchecked
+
+        if role == Qt.DisplayRole and col > 0:
+            col_name = self._columns[col] if col < len(self._columns) else ""
+            return str(entry.values.get(col_name, ""))
+
+        # Store entry ref for external access
+        if role == Qt.UserRole:
+            return entry
+
+        return None
+
+    def setData(self, index, value, role=Qt.EditRole):
+        if not index.isValid():
+            return False
+        if role == Qt.CheckStateRole and index.column() == 0:
+            entry = self.get_entry(index.row())
+            if entry and not entry.header_row:
+                entry.checked = (value == Qt.Checked)
+                self.dataChanged.emit(index, index, [Qt.CheckStateRole])
+                return True
+        return False
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            if 0 <= section < len(self._columns):
+                return self._columns[section]
+        return None
+
+
+# ── Delegate for header-row spanning ─────────────────────────
+
+
+class SpanDelegate(QStyledItemDelegate):
+    """Provides visual spanning for group-header rows.
+
+    QTreeView doesn't natively support setFirstColumnSpanned on a flat model,
+    so we handle it via the delegate + model data roles above.
+    """
+    pass  # The model returns data for col 0 only on header rows; other cols are blank.
+
+
+# ── View widget ──────────────────────────────────────────────
+
+
 class ResultsView(QWidget):
-    """Results display with tree view for grouped results and table for flat results."""
+    """Results display using QTreeView + QAbstractItemModel."""
 
-    selection_changed = Signal(int)  # number of selected items
+    selection_changed = Signal(int)
     item_activated = Signal(object)  # ResultEntry
-    current_items_changed = Signal(list)  # list of file paths for currently highlighted items
-    context_menu_requested = Signal(object, object)  # QPoint, ResultEntry
+    current_items_changed = Signal(list)
+    context_menu_requested = Signal(object, object)
 
-    # Group header uses the system highlight color (darkened) so it works on
-    # both light and dark themes.  Computed lazily on first result display.
     _header_colors_ready = False
     HEADER_BG = QColor()
     HEADER_FG = QColor()
@@ -29,13 +181,12 @@ class ResultsView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._active_tab = ActiveTab.DUPLICATE_FILES
-        self._results: list[ResultEntry] = []
         self._sort_column = -1
         self._sort_order = Qt.AscendingOrder
+        self._model = ResultsModel(self)
         self._setup_ui()
 
     def _ensure_header_colors(self):
-        """Derive group header colors from the system palette."""
         if self._header_colors_ready:
             return
         from PySide6.QtWidgets import QApplication
@@ -50,6 +201,7 @@ class ResultsView(QWidget):
         )
         self.HEADER_FG = palette.color(QPalette.ColorRole.HighlightedText)
         self._header_colors_ready = True
+        self._model.set_header_colors(self.HEADER_BG, self.HEADER_FG)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -65,39 +217,48 @@ class ResultsView(QWidget):
         summary_layout.addWidget(self._selection_label)
         layout.addLayout(summary_layout)
 
-        # Tree widget for results
-        self._tree = QTreeWidget()
+        # Tree view backed by model
+        self._tree = QTreeView()
+        self._tree.setModel(self._model)
         self._tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._tree.setRootIsDecorated(False)
         self._tree.setAlternatingRowColors(True)
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        self._tree.customContextMenuRequested.connect(self._on_context_menu)
-        self._tree.itemChanged.connect(self._on_item_changed)
-        self._tree.itemDoubleClicked.connect(self._on_item_double_clicked)
-        self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
+        self._tree.setItemDelegate(SpanDelegate(self._tree))
 
-        # Sortable: click header to sort
-        self._tree.setSortingEnabled(False)  # We handle sorting manually
+        self._tree.customContextMenuRequested.connect(self._on_context_menu)
+        self._tree.doubleClicked.connect(self._on_double_clicked)
+        self._tree.selectionModel().selectionChanged.connect(self._on_tree_selection_changed) if self._tree.selectionModel() else None
+
+        # Checkbox clicks via model dataChanged
+        self._model.dataChanged.connect(self._on_model_data_changed)
+
+        # Sortable headers
         header = self._tree.header()
         header.setSectionsClickable(True)
         header.sectionClicked.connect(self._on_header_clicked)
-        # Resizable columns
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
 
         layout.addWidget(self._tree)
 
+    # ── Tab / data ───────────────────────────────────────────
+
     def set_active_tab(self, tab: ActiveTab):
         self._active_tab = tab
         self._sort_column = -1
         columns = TAB_COLUMNS.get(tab, ["Selection", "File Name", "Path"])
-        self._tree.setColumnCount(len(columns))
-        self._tree.setHeaderLabels(columns)
+        self._model.set_columns(columns)
+
+        # Reconnect selection model (it gets replaced on model reset)
+        sm = self._tree.selectionModel()
+        if sm:
+            sm.selectionChanged.connect(self._on_tree_selection_changed)
+
+        # Column sizing
         header = self._tree.header()
-        # All columns interactive (resizable), last one stretches
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
-        # Give Path columns more initial space
         for i, col in enumerate(columns):
             if col == "Path":
                 header.resizeSection(i, 300)
@@ -110,73 +271,22 @@ class ResultsView(QWidget):
 
     def set_results(self, results: list[ResultEntry]):
         self._ensure_header_colors()
-        self._results = results
-        self._rebuild_tree()
-        self._update_summary()
+        self._model.set_results(results)
 
-    def _rebuild_tree(self):
-        """Rebuild tree items from self._results.
-
-        Uses batch insertion and deferred header spanning for performance.
-        """
-        self._tree.blockSignals(True)
-        self._tree.setUpdatesEnabled(False)
-        self._tree.clear()
-
-        columns = TAB_COLUMNS.get(self._active_tab, ["Selection", "File Name", "Path"])
-        num_cols = len(columns)
-
-        items = []
-        header_indices = []
-
-        for entry in self._results:
+        # Span header rows across all columns
+        for row, entry in enumerate(results):
             if entry.header_row:
-                item = QTreeWidgetItem()
-                header_text = entry.values.get("__header", "Group")
-                item.setText(0, header_text)
-                font = QFont()
-                font.setBold(True)
-                item.setFont(0, font)
-                for col in range(num_cols):
-                    item.setBackground(col, QBrush(self.HEADER_BG))
-                    item.setForeground(col, QBrush(self.HEADER_FG))
-                item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
-                item.setData(0, Qt.UserRole, entry)
-                header_indices.append(len(items))
-                items.append(item)
-            else:
-                item = QTreeWidgetItem()
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(0, Qt.Checked if entry.checked else Qt.Unchecked)
+                self._tree.setFirstColumnSpanned(row, QModelIndex(), True)
 
-                for col_idx, col_name in enumerate(columns):
-                    if col_idx == 0:
-                        continue
-                    value = entry.values.get(col_name, "")
-                    item.setText(col_idx, str(value))
-
-                item.setData(0, Qt.UserRole, entry)
-                items.append(item)
-
-        # Batch insert all items at once (much faster than one-by-one)
-        self._tree.addTopLevelItems(items)
-
-        # Header spanning must be set after items are added to the tree
-        for idx in header_indices:
-            self._tree.topLevelItem(idx).setFirstColumnSpanned(True)
-
-        self._tree.setUpdatesEnabled(True)
-        self._tree.blockSignals(False)
+        self._update_summary()
 
     # ── Sorting ──────────────────────────────────────────────
 
     def _on_header_clicked(self, logical_index: int):
-        """Sort by column when header is clicked. Toggle ascending/descending."""
         if logical_index == 0:
-            return  # Don't sort by checkbox column
+            return
 
         if self._sort_column == logical_index:
-            # Toggle order
             self._sort_order = (
                 Qt.DescendingOrder if self._sort_order == Qt.AscendingOrder
                 else Qt.AscendingOrder
@@ -187,21 +297,29 @@ class ResultsView(QWidget):
 
         columns = TAB_COLUMNS.get(self._active_tab, [])
         col_name = columns[logical_index] if logical_index < len(columns) else ""
-
-        # Update header sort indicator
         self._tree.header().setSortIndicator(logical_index, self._sort_order)
         self._tree.header().setSortIndicatorShown(True)
 
         ascending = self._sort_order == Qt.AscendingOrder
+        results = self._model.get_results()
 
         if self._active_tab in GROUPED_TABS:
-            self._sort_within_groups(col_name, ascending)
+            sorted_results = self._sort_within_groups(results, col_name, ascending)
         else:
-            self._sort_flat(col_name, ascending)
+            sorted_results = sorted(
+                results,
+                key=lambda e: self._sort_key(e, col_name),
+                reverse=not ascending,
+            )
 
-    def _sort_key(self, entry: ResultEntry, col_name: str):
-        """Return a sort key for a result entry by column name."""
-        # Use numeric values for known numeric columns
+        self._model.sort_results(sorted_results)
+        # Re-apply header spanning
+        for row, entry in enumerate(sorted_results):
+            if entry.header_row:
+                self._tree.setFirstColumnSpanned(row, QModelIndex(), True)
+
+    @staticmethod
+    def _sort_key(entry: ResultEntry, col_name: str):
         if col_name in ("Size",):
             return entry.values.get("__size_bytes", 0)
         if col_name in ("Modification Date",):
@@ -212,28 +330,19 @@ class ResultsView(QWidget):
                 return float(str(raw).replace(",", ""))
             except (ValueError, TypeError):
                 return 0
-        # Default: string comparison (case-insensitive)
         return str(entry.values.get(col_name, "")).lower()
 
-    def _sort_flat(self, col_name: str, ascending: bool):
-        """Sort flat (non-grouped) results."""
-        self._results.sort(
-            key=lambda e: self._sort_key(e, col_name),
-            reverse=not ascending,
-        )
-        self._rebuild_tree()
-
-    def _sort_within_groups(self, col_name: str, ascending: bool):
-        """Sort entries within each group, keeping group headers in place."""
+    @staticmethod
+    def _sort_within_groups(results: list[ResultEntry], col_name: str, ascending: bool) -> list[ResultEntry]:
         sorted_results = []
         current_group = []
         current_header = None
 
-        for entry in self._results:
+        for entry in results:
             if entry.header_row:
                 if current_header is not None:
                     current_group.sort(
-                        key=lambda e: self._sort_key(e, col_name),
+                        key=lambda e: ResultsView._sort_key(e, col_name),
                         reverse=not ascending,
                     )
                     sorted_results.append(current_header)
@@ -243,50 +352,53 @@ class ResultsView(QWidget):
             else:
                 current_group.append(entry)
 
-        # Last group
         if current_header is not None:
             current_group.sort(
-                key=lambda e: self._sort_key(e, col_name),
+                key=lambda e: ResultsView._sort_key(e, col_name),
                 reverse=not ascending,
             )
             sorted_results.append(current_header)
             sorted_results.extend(current_group)
 
-        self._results = sorted_results
-        self._rebuild_tree()
+        return sorted_results
 
     def sort_by_column(self, column: int, ascending: bool = True):
-        """Public API for sorting (used by sort dialog)."""
         self._sort_column = column
         self._sort_order = Qt.AscendingOrder if ascending else Qt.DescendingOrder
         columns = TAB_COLUMNS.get(self._active_tab, [])
         col_name = columns[column] if column < len(columns) else ""
         self._tree.header().setSortIndicator(column, self._sort_order)
         self._tree.header().setSortIndicatorShown(True)
+
+        results = self._model.get_results()
         if self._active_tab in GROUPED_TABS:
-            self._sort_within_groups(col_name, ascending)
+            sorted_results = self._sort_within_groups(results, col_name, ascending)
         else:
-            self._sort_flat(col_name, ascending)
+            sorted_results = sorted(
+                results,
+                key=lambda e: self._sort_key(e, col_name),
+                reverse=not ascending,
+            )
+        self._model.sort_results(sorted_results)
+        for row, entry in enumerate(sorted_results):
+            if entry.header_row:
+                self._tree.setFirstColumnSpanned(row, QModelIndex(), True)
 
     # ── Item events ──────────────────────────────────────────
 
-    def _on_item_changed(self, item, column):
-        if column == 0:
-            entry = item.data(0, Qt.UserRole)
-            if entry and not entry.header_row:
-                entry.checked = item.checkState(0) == Qt.Checked
-                self._update_selection_count()
+    def _on_model_data_changed(self, top_left, bottom_right, roles):
+        if Qt.CheckStateRole in roles:
+            self._update_selection_count()
 
-    def _on_item_double_clicked(self, item, column):
-        entry = item.data(0, Qt.UserRole)
+    def _on_double_clicked(self, index: QModelIndex):
+        entry = self._model.get_entry(index.row())
         if entry and not entry.header_row:
             self.item_activated.emit(entry)
 
     def _on_tree_selection_changed(self):
-        """Emit file paths of all currently highlighted (blue-selected) items."""
         paths = []
-        for item in self._tree.selectedItems():
-            entry = item.data(0, Qt.UserRole)
+        for index in self._tree.selectionModel().selectedRows():
+            entry = self._model.get_entry(index.row())
             if entry and not entry.header_row:
                 path = entry.values.get("__full_path", "")
                 if path:
@@ -294,30 +406,31 @@ class ResultsView(QWidget):
         self.current_items_changed.emit(paths)
 
     def _on_context_menu(self, pos):
-        item = self._tree.itemAt(pos)
-        if item:
-            entry = item.data(0, Qt.UserRole)
-            if entry and not entry.header_row:
-                menu = QMenu(self)
-                open_action = QAction(tr("context-open-file"), self)
-                open_action.triggered.connect(lambda: self._open_file(entry))
-                menu.addAction(open_action)
+        index = self._tree.indexAt(pos)
+        if not index.isValid():
+            return
+        entry = self._model.get_entry(index.row())
+        if entry and not entry.header_row:
+            menu = QMenu(self)
+            open_action = QAction(tr("context-open-file"), self)
+            open_action.triggered.connect(lambda: self._open_file(entry))
+            menu.addAction(open_action)
 
-                open_dir_action = QAction(tr("context-open-folder"), self)
-                open_dir_action.triggered.connect(lambda: self._open_folder(entry))
-                menu.addAction(open_dir_action)
+            open_dir_action = QAction(tr("context-open-folder"), self)
+            open_dir_action.triggered.connect(lambda: self._open_folder(entry))
+            menu.addAction(open_dir_action)
 
-                menu.addSeparator()
+            menu.addSeparator()
 
-                select_action = QAction(tr("context-select"), self)
-                select_action.triggered.connect(lambda: self._set_check(item, True))
-                menu.addAction(select_action)
+            select_action = QAction(tr("context-select"), self)
+            select_action.triggered.connect(lambda: self._model.set_checked(index.row(), True))
+            menu.addAction(select_action)
 
-                deselect_action = QAction(tr("context-deselect"), self)
-                deselect_action.triggered.connect(lambda: self._set_check(item, False))
-                menu.addAction(deselect_action)
+            deselect_action = QAction(tr("context-deselect"), self)
+            deselect_action.triggered.connect(lambda: self._model.set_checked(index.row(), False))
+            menu.addAction(deselect_action)
 
-                menu.exec(self._tree.viewport().mapToGlobal(pos))
+            menu.exec(self._tree.viewport().mapToGlobal(pos))
 
     def _open_file(self, entry: ResultEntry):
         import subprocess, sys
@@ -351,16 +464,14 @@ class ResultsView(QWidget):
         except OSError:
             pass
 
-    def _set_check(self, item, checked):
-        item.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
-
     # ── Summary / selection ──────────────────────────────────
 
     def _update_summary(self):
-        entries = [r for r in self._results if not r.header_row]
+        results = self._model.get_results()
+        entries = [r for r in results if not r.header_row]
         total = len(entries)
         total_size = sum(r.values.get("__size_bytes", 0) for r in entries)
-        groups = sum(1 for r in self._results if r.header_row)
+        groups = sum(1 for r in results if r.header_row)
         size_str = _format_size(total_size)
         if self._active_tab in GROUPED_TABS and groups > 0:
             self._summary_label.setText(tr("results-found-grouped", total=total, size=size_str, groups=groups))
@@ -371,7 +482,8 @@ class ResultsView(QWidget):
         self._update_selection_count()
 
     def _update_selection_count(self):
-        entries = [r for r in self._results if not r.header_row]
+        results = self._model.get_results()
+        entries = [r for r in results if not r.header_row]
         total = len(entries)
         total_size = sum(r.values.get("__size_bytes", 0) for r in entries)
         checked = [r for r in entries if r.checked]
@@ -379,93 +491,88 @@ class ResultsView(QWidget):
         selected_size = sum(r.values.get("__size_bytes", 0) for r in checked)
         if selected > 0:
             self._selection_label.setText(
-                tr("results-selected", selected=selected, total=total, selected_size=_format_size(selected_size), total_size=_format_size(total_size))
+                tr("results-selected", selected=selected, total=total,
+                   selected_size=_format_size(selected_size), total_size=_format_size(total_size))
             )
         else:
             self._selection_label.setText("")
         self.selection_changed.emit(selected)
 
     def apply_selection(self, mode: SelectMode):
-        self._tree.blockSignals(True)
+        results = self._model.get_results()
 
         if mode == SelectMode.SELECT_ALL:
-            self._select_all(True)
+            self._set_all(results, True)
         elif mode == SelectMode.UNSELECT_ALL:
-            self._select_all(False)
+            self._set_all(results, False)
         elif mode == SelectMode.INVERT_SELECTION:
-            self._invert_selection()
+            for r in results:
+                if not r.header_row:
+                    r.checked = not r.checked
         elif mode in (SelectMode.SELECT_BIGGEST_SIZE, SelectMode.SELECT_SMALLEST_SIZE,
                       SelectMode.SELECT_NEWEST, SelectMode.SELECT_OLDEST,
                       SelectMode.SELECT_BIGGEST_RESOLUTION, SelectMode.SELECT_SMALLEST_RESOLUTION,
                       SelectMode.SELECT_SHORTEST_PATH, SelectMode.SELECT_LONGEST_PATH):
-            self._select_by_group_criteria(mode)
+            self._select_by_group_criteria(results, mode)
 
-        self._tree.blockSignals(False)
+        # Notify model of bulk change
+        if results:
+            self._model.dataChanged.emit(
+                self._model.index(0, 0),
+                self._model.index(len(results) - 1, 0),
+                [Qt.CheckStateRole],
+            )
         self._update_selection_count()
 
-    def _select_all(self, checked: bool):
-        for i in range(self._tree.topLevelItemCount()):
-            item = self._tree.topLevelItem(i)
-            entry = item.data(0, Qt.UserRole)
-            if entry and not entry.header_row:
-                entry.checked = checked
-                item.setCheckState(0, Qt.Checked if checked else Qt.Unchecked)
+    @staticmethod
+    def _set_all(results: list[ResultEntry], checked: bool):
+        for r in results:
+            if not r.header_row:
+                r.checked = checked
 
-    def _invert_selection(self):
-        for i in range(self._tree.topLevelItemCount()):
-            item = self._tree.topLevelItem(i)
-            entry = item.data(0, Qt.UserRole)
-            if entry and not entry.header_row:
-                entry.checked = not entry.checked
-                item.setCheckState(0, Qt.Checked if entry.checked else Qt.Unchecked)
-
-    def _select_by_group_criteria(self, mode: SelectMode):
-        self._select_all(False)
+    def _select_by_group_criteria(self, results: list[ResultEntry], mode: SelectMode):
+        self._set_all(results, False)
 
         if self._active_tab not in GROUPED_TABS:
             return
 
-        groups: dict[int, list[tuple[int, ResultEntry]]] = {}
-        for i in range(self._tree.topLevelItemCount()):
-            item = self._tree.topLevelItem(i)
-            entry = item.data(0, Qt.UserRole)
-            if entry and not entry.header_row:
-                groups.setdefault(entry.group_id, []).append((i, entry))
+        groups: dict[int, list[ResultEntry]] = {}
+        for r in results:
+            if not r.header_row:
+                groups.setdefault(r.group_id, []).append(r)
 
-        for group_id, items in groups.items():
-            if len(items) <= 1:
+        for group_entries in groups.values():
+            if len(group_entries) <= 1:
                 continue
 
             best_idx = 0
             if mode == SelectMode.SELECT_BIGGEST_SIZE:
-                best_idx = max(range(len(items)), key=lambda j: items[j][1].values.get("__size_bytes", 0))
+                best_idx = max(range(len(group_entries)), key=lambda j: group_entries[j].values.get("__size_bytes", 0))
             elif mode == SelectMode.SELECT_SMALLEST_SIZE:
-                best_idx = min(range(len(items)), key=lambda j: items[j][1].values.get("__size_bytes", 0))
+                best_idx = min(range(len(group_entries)), key=lambda j: group_entries[j].values.get("__size_bytes", 0))
             elif mode == SelectMode.SELECT_NEWEST:
-                best_idx = max(range(len(items)), key=lambda j: items[j][1].values.get("__modified_date_ts", 0))
+                best_idx = max(range(len(group_entries)), key=lambda j: group_entries[j].values.get("__modified_date_ts", 0))
             elif mode == SelectMode.SELECT_OLDEST:
-                best_idx = min(range(len(items)), key=lambda j: items[j][1].values.get("__modified_date_ts", 0))
+                best_idx = min(range(len(group_entries)), key=lambda j: group_entries[j].values.get("__modified_date_ts", 0))
             elif mode == SelectMode.SELECT_SHORTEST_PATH:
-                best_idx = min(range(len(items)), key=lambda j: len(items[j][1].values.get("__full_path", "")))
+                best_idx = min(range(len(group_entries)), key=lambda j: len(group_entries[j].values.get("__full_path", "")))
             elif mode == SelectMode.SELECT_LONGEST_PATH:
-                best_idx = max(range(len(items)), key=lambda j: len(items[j][1].values.get("__full_path", "")))
+                best_idx = max(range(len(group_entries)), key=lambda j: len(group_entries[j].values.get("__full_path", "")))
 
-            for j, (tree_idx, entry) in enumerate(items):
+            for j, entry in enumerate(group_entries):
                 if j != best_idx:
                     entry.checked = True
-                    self._tree.topLevelItem(tree_idx).setCheckState(0, Qt.Checked)
 
     # ── Public accessors ─────────────────────────────────────
 
     def get_checked_entries(self) -> list[ResultEntry]:
-        return [r for r in self._results if r.checked and not r.header_row]
+        return [r for r in self._model.get_results() if r.checked and not r.header_row]
 
     def get_all_entries(self) -> list[ResultEntry]:
-        return [r for r in self._results if not r.header_row]
+        return [r for r in self._model.get_results() if not r.header_row]
 
     def clear(self):
-        self._results = []
-        self._tree.clear()
+        self._model.set_results([])
         self._sort_column = -1
         self._tree.header().setSortIndicatorShown(False)
         self._summary_label.setText(tr("results-no-results"))

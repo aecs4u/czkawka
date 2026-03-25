@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 
 from .models import ActiveTab, ScanProgress
+from .utils import format_size as _format_size
 from .utils import MEDIUM_SPACING, GRID_UNIT
 from .localizer import tr
 
@@ -208,7 +209,7 @@ class ProgressWidget(QWidget):
                 self._stage_pct.setText(f"{pct}%")
                 self._detail_label.setText(f"{checked:,} / {to_check:,}")
                 self._size_label.setText(
-                    f"{self._format_size(b_checked)} / {self._format_size(b_to_check)}"
+                    f"{_format_size(b_checked)} / {_format_size(b_to_check)}"
                 )
             else:
                 # Entry-count based progress

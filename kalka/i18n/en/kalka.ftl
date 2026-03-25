@@ -172,6 +172,8 @@ tool-settings-title = Tool Settings
 subsettings-check-method = Check Method:
 subsettings-hash-type = Hash Type:
 subsettings-case-sensitive = Case sensitive name comparison
+subsettings-use-reference = Use reference folders
+subsettings-use-reference-tooltip = When enabled, files in reference directories will be used for comparison but won't appear in results
 
 # Similar images
 subsettings-hash-size = Hash Size:

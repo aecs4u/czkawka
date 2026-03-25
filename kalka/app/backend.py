@@ -15,6 +15,7 @@ from .models import (
     ActiveTab, AppSettings, ToolSettings, ResultEntry, ScanProgress,
     TAB_TO_CLI_COMMAND, GROUPED_TABS, CheckingMethod, MusicSearchMethod,
 )
+from .utils import format_size as _format_size
 
 log = get_logger("backend")
 
@@ -224,6 +225,8 @@ class ScanWorker(QObject):
             cmd.append("-H")
         if s.thread_number > 0:
             cmd.extend(["-T", str(s.thread_number)])
+        if s.use_reference_folders and s.reference_paths:
+            cmd.extend(["-r", ",".join(s.reference_paths)])
 
         # Tool-specific args
         if self.tab == ActiveTab.DUPLICATE_FILES:
@@ -361,7 +364,7 @@ class ScanWorker(QObject):
                 total_size = sum(e.get("size", 0) for e in group if isinstance(e, dict))
                 header_text = (
                     f"Group {group_id + 1} ({len(group)} files, "
-                    f"{self._format_size(total_size)})"
+                    f"{_format_size(total_size)})"
                 )
                 header = ResultEntry(
                     values={"__header": header_text},
@@ -400,7 +403,7 @@ class ScanWorker(QObject):
             "Symlink Name": p.name,
             "Path": str(p.parent),
             "Symlink Path": str(p.parent),
-            "Size": self._format_size(entry.get("size", 0)),
+            "Size": _format_size(entry.get("size", 0)),
             "Modification Date": self._format_date(entry.get("modified_date", 0)),
             "Hash": entry.get("hash", ""),
             "Similarity": str(entry.get("similarity", "")),

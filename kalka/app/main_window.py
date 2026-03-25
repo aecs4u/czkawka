@@ -167,6 +167,10 @@ class MainWindow(QMainWindow):
         self._results_view.item_activated.connect(self._on_item_activated)
         self._results_view.current_items_changed.connect(self._on_current_items_changed)
 
+        # Tool settings
+        self._tool_settings.reference_toggled.connect(self._on_reference_toggled)
+        self._tool_settings.set_use_reference(self._state.settings.use_reference_folders)
+
         # Scan runner
         self._scan_runner.finished.connect(self._on_scan_finished)
         self._scan_runner.progress.connect(self._on_scan_progress)
@@ -279,6 +283,9 @@ class MainWindow(QMainWindow):
             self._preview.show_preview(paths[0])
         elif len(paths) == 0:
             self._preview.clear_preview()
+
+    def _on_reference_toggled(self, enabled: bool):
+        self._state.settings.use_reference_folders = enabled
 
     def _show_settings(self):
         self._settings_panel.setVisible(True)

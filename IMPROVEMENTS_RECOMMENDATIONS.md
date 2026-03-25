@@ -51,21 +51,21 @@ The three highest-value improvements are:
 
 ### Quick wins (< 1 day each)
 
-- [ ] **Fix stop-scan cleanup** — store the active tab at scan start, use it in `_check_stop_cleanup()` instead of hardcoded `DUPLICATE_FILES`. (`kalka/app/backend.py`)
-- [ ] **Surface stderr diagnostics** — collect non-JSON stderr lines during scan, display them in the bottom panel on completion. (`kalka/app/backend.py`)
-- [ ] **Add Similar Documents to Kalka** — new `ActiveTab` entry, `TAB_TO_CLI_COMMAND` mapping, column definitions. (`kalka/app/models.py`, `left_panel.py`)
-- [ ] **Resolve reference-folder TODO** — investigate and either fix or document the limitation at `similar_images/core.rs:523`.
+- [x] **Fix stop-scan cleanup** — store the active tab at scan start, use it in `_check_stop_cleanup()` instead of hardcoded `DUPLICATE_FILES`. (`kalka/app/backend.py`)
+- [x] **Surface stderr diagnostics** — collect non-JSON stderr lines during scan, display them in the bottom panel on completion. (`kalka/app/backend.py`)
+- [x] **Add Similar Documents to Kalka** — new `ActiveTab` entry, `TAB_TO_CLI_COMMAND` mapping, column definitions. (`kalka/app/models.py`, `left_panel.py`)
+- [x] **Resolve reference-folder TODO** — added `verify_referenced_items()` for reference-folder output validation alongside existing `verify_duplicated_items()`. (`similar_images/core.rs`)
 
 ### Medium (1–3 days each)
 
-- [ ] **Stable JSON results envelope** — add `schema_version`, `tool_type`, `messages` wrapper to CLI output. Optional `--json-results-stdout` mode. (`czkawka_cli/src/main.rs`)
-- [ ] **CLI integration tests** — per-subcommand tests covering argument parsing, exit codes, and JSON output shape. (`czkawka_cli/tests/`)
-- [ ] **Scan state machine** — replace `scanning`/`processing`/`stop_requested` booleans in `AppState` with an enum-based state machine (idle → scanning → stopping → idle). (`kalka/app/state.py`)
-- [ ] **Strongly type settings** — convert `excluded_items`, `allowed_extensions`, `excluded_extensions` from raw strings to lists at the settings layer. (`kalka/app/models.py`, `backend.py`)
+- [x] **Stable JSON results envelope** — `--json-compact-stdout` flag writes `{schema_version, tool_type, results, messages}` to stdout. (`czkawka_cli/src/main.rs`, `commands.rs`)
+- [x] **CLI integration tests** — per-subcommand tests covering argument parsing, exit codes, JSON file output, and `--json-compact-stdout` envelope shape. (`czkawka_cli/tests/integration.rs`)
+- [x] **Scan state machine** — replaced `scanning`/`processing`/`stop_requested` booleans with `ScanState` enum (IDLE → SCANNING → STOPPING). (`kalka/app/state.py`)
+- [x] **Strongly type settings** — `excluded_items`, `allowed_extensions`, `excluded_extensions` are now `list[str]` with backward-compatible loading. (`kalka/app/models.py`, `backend.py`, `state.py`)
 
 ### Deep refactors (5+ days each)
 
-- [ ] **Replace `QTreeWidget` with `QTreeView` + model** — implement `QAbstractItemModel` for results, move sorting/selection into model layer. (`kalka/app/results_view.py`)
+- [x] **Replace `QTreeWidget` with `QTreeView` + model** — implemented `ResultsModel(QAbstractItemModel)` with sorting/selection in the model layer. (`kalka/app/results_view.py`)
 - [ ] **Reduce CLI command dispatch duplication** — extract a trait/runner abstraction so tool setup, saving, exit handling, and progress wiring are defined once. (`czkawka_cli/src/main.rs`)
 - [ ] **Audit and reduce runtime panics** — systematic pass over ~258 `unwrap`/`panic`/`expect` sites in `czkawka_core`, converting user-triggerable ones to typed errors. (`czkawka_core/src/`)
 - [ ] **Standardize result metadata** — common serialized envelope across all core tools so consumers don't infer shape per-tool. (`czkawka_core/src/`)

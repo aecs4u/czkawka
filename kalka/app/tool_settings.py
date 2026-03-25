@@ -16,6 +16,7 @@ from .models import (
 class ToolSettingsPanel(QWidget):
     """Per-tool settings panel shown on the right side."""
     settings_changed = Signal()
+    reference_toggled = Signal(bool)
 
     def __init__(self, tool_settings: ToolSettings, parent=None):
         super().__init__(parent)
@@ -69,6 +70,9 @@ class ToolSettingsPanel(QWidget):
         for t, panel in self._panels.items():
             panel.setVisible(t == tab)
 
+    def set_use_reference(self, enabled: bool):
+        self._dup_reference.setChecked(enabled)
+
     def _create_duplicate_panel(self) -> QWidget:
         panel = QWidget()
         layout = QFormLayout(panel)
@@ -111,6 +115,13 @@ class ToolSettingsPanel(QWidget):
         self._dup_case.setChecked(self._ts.dup_name_case_sensitive)
         self._dup_case.toggled.connect(lambda v: setattr(self._ts, 'dup_name_case_sensitive', v))
         layout.addRow(self._dup_case)
+
+        # Use reference folders
+        self._dup_reference = QCheckBox(tr("subsettings-use-reference"))
+        self._dup_reference.setChecked(False)
+        self._dup_reference.setToolTip(tr("subsettings-use-reference-tooltip"))
+        self._dup_reference.toggled.connect(self.reference_toggled.emit)
+        layout.addRow(self._dup_reference)
 
         return panel
 

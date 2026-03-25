@@ -128,7 +128,8 @@ def app_logo_path() -> str:
     """Return absolute path to the kalka logo PNG."""
     from pathlib import Path
     for candidate in [
-        Path(__file__).parent.parent / "icons" / "kalka.png",
+        Path(__file__).parent.parent / "icons" / "kalka_logo_name_horizontal.png",
+        Path(__file__).parent.parent / "icons" / "kalka_logo.png",
     ]:
         if candidate.exists():
             return str(candidate)

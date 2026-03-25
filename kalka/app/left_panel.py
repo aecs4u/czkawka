@@ -52,8 +52,9 @@ class LeftPanel(QWidget):
         if logo_path:
             self._logo_label = QLabel()
             pixmap = QPixmap(logo_path)
-            scaled = pixmap.scaledToHeight(210, Qt.SmoothTransformation)
+            scaled = pixmap.scaledToWidth(220, Qt.SmoothTransformation)
             self._logo_label.setPixmap(scaled)
+            self._logo_label.setScaledContents(False)
             self._logo_label.setAlignment(Qt.AlignCenter)
             self._logo_label.setCursor(Qt.PointingHandCursor)
             self._logo_label.setToolTip(tr("about-logo-tooltip"))

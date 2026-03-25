@@ -68,6 +68,7 @@ fn main() {
     }
 
     let json_progress = command.get_json_progress();
+    let tool_type = command.tool_type_name();
     let (progress_sender, progress_receiver): (Sender<ProgressData>, Receiver<ProgressData>) = bounded(256);
     let stop_flag = Arc::new(AtomicBool::new(false));
     let store_flag_cloned = stop_flag.clone();
@@ -75,21 +76,21 @@ fn main() {
     let calculate_thread = thread::Builder::new()
         .stack_size(DEFAULT_THREAD_SIZE)
         .spawn(move || match command {
-            Commands::Duplicates(duplicates_args) => duplicates(duplicates_args, &stop_flag, &progress_sender),
-            Commands::EmptyFolders(empty_folders_args) => empty_folders(empty_folders_args, &stop_flag, &progress_sender),
-            Commands::BiggestFiles(biggest_files_args) => biggest_files(biggest_files_args, &stop_flag, &progress_sender),
-            Commands::EmptyFiles(empty_files_args) => empty_files(empty_files_args, &stop_flag, &progress_sender),
-            Commands::Temporary(temporary_args) => temporary(temporary_args, &stop_flag, &progress_sender),
-            Commands::SimilarImages(similar_images_args) => similar_images(similar_images_args, &stop_flag, &progress_sender),
-            Commands::SameMusic(same_music_args) => same_music(same_music_args, &stop_flag, &progress_sender),
-            Commands::InvalidSymlinks(invalid_symlinks_args) => invalid_symlinks(invalid_symlinks_args, &stop_flag, &progress_sender),
-            Commands::BrokenFiles(broken_files_args) => broken_files(broken_files_args, &stop_flag, &progress_sender),
-            Commands::SimilarVideos(similar_videos_args) => similar_videos(similar_videos_args, &stop_flag, &progress_sender),
-            Commands::BadExtensions(bad_extensions_args) => bad_extensions(bad_extensions_args, &stop_flag, &progress_sender),
-            Commands::BadNames(bad_names_args) => bad_names(bad_names_args, &stop_flag, &progress_sender),
-            Commands::VideoOptimizer(video_optimizer_args) => video_optimizer(video_optimizer_args, &stop_flag, &progress_sender),
-            Commands::ExifRemover(exif_remover_args) => exif_remover(exif_remover_args, &stop_flag, &progress_sender),
-            Commands::SimilarDocuments(similar_documents_args) => similar_documents(similar_documents_args, &stop_flag, &progress_sender),
+            Commands::Duplicates(duplicates_args) => duplicates(duplicates_args, &stop_flag, &progress_sender, tool_type),
+            Commands::EmptyFolders(empty_folders_args) => empty_folders(empty_folders_args, &stop_flag, &progress_sender, tool_type),
+            Commands::BiggestFiles(biggest_files_args) => biggest_files(biggest_files_args, &stop_flag, &progress_sender, tool_type),
+            Commands::EmptyFiles(empty_files_args) => empty_files(empty_files_args, &stop_flag, &progress_sender, tool_type),
+            Commands::Temporary(temporary_args) => temporary(temporary_args, &stop_flag, &progress_sender, tool_type),
+            Commands::SimilarImages(similar_images_args) => similar_images(similar_images_args, &stop_flag, &progress_sender, tool_type),
+            Commands::SameMusic(same_music_args) => same_music(same_music_args, &stop_flag, &progress_sender, tool_type),
+            Commands::InvalidSymlinks(invalid_symlinks_args) => invalid_symlinks(invalid_symlinks_args, &stop_flag, &progress_sender, tool_type),
+            Commands::BrokenFiles(broken_files_args) => broken_files(broken_files_args, &stop_flag, &progress_sender, tool_type),
+            Commands::SimilarVideos(similar_videos_args) => similar_videos(similar_videos_args, &stop_flag, &progress_sender, tool_type),
+            Commands::BadExtensions(bad_extensions_args) => bad_extensions(bad_extensions_args, &stop_flag, &progress_sender, tool_type),
+            Commands::BadNames(bad_names_args) => bad_names(bad_names_args, &stop_flag, &progress_sender, tool_type),
+            Commands::VideoOptimizer(video_optimizer_args) => video_optimizer(video_optimizer_args, &stop_flag, &progress_sender, tool_type),
+            Commands::ExifRemover(exif_remover_args) => exif_remover(exif_remover_args, &stop_flag, &progress_sender, tool_type),
+            Commands::SimilarDocuments(similar_documents_args) => similar_documents(similar_documents_args, &stop_flag, &progress_sender, tool_type),
         })
         .expect("Failed to spawn calculation thread");
 
@@ -124,7 +125,7 @@ fn main() {
     }
 }
 
-fn duplicates(duplicates: DuplicatesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn duplicates(duplicates: DuplicatesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let DuplicatesArgs {
         common_cli_items,
         reference_directories,
@@ -162,10 +163,10 @@ fn duplicates(duplicates: DuplicatesArgs, stop_flag: &Arc<AtomicBool>, progress_
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn empty_folders(empty_folders: EmptyFoldersArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn empty_folders(empty_folders: EmptyFoldersArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let EmptyFoldersArgs { common_cli_items, delete_method } = empty_folders;
 
     let mut tool = EmptyFolder::new();
@@ -175,10 +176,10 @@ fn empty_folders(empty_folders: EmptyFoldersArgs, stop_flag: &Arc<AtomicBool>, p
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn biggest_files(biggest_files: BiggestFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn biggest_files(biggest_files: BiggestFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let BiggestFilesArgs {
         common_cli_items,
         number_of_files,
@@ -195,10 +196,10 @@ fn biggest_files(biggest_files: BiggestFilesArgs, stop_flag: &Arc<AtomicBool>, p
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn empty_files(empty_files: EmptyFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn empty_files(empty_files: EmptyFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let EmptyFilesArgs { common_cli_items, delete_method } = empty_files;
 
     let mut tool = EmptyFiles::new();
@@ -208,10 +209,10 @@ fn empty_files(empty_files: EmptyFilesArgs, stop_flag: &Arc<AtomicBool>, progres
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn temporary(temporary: TemporaryArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn temporary(temporary: TemporaryArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let TemporaryArgs { common_cli_items, delete_method } = temporary;
 
     let mut tool = Temporary::new();
@@ -221,10 +222,10 @@ fn temporary(temporary: TemporaryArgs, stop_flag: &Arc<AtomicBool>, progress_sen
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn similar_images(similar_images: SimilarImagesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn similar_images(similar_images: SimilarImagesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let SimilarImagesArgs {
         common_cli_items,
         reference_directories,
@@ -250,10 +251,10 @@ fn similar_images(similar_images: SimilarImagesArgs, stop_flag: &Arc<AtomicBool>
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn same_music(same_music: SameMusicArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn same_music(same_music: SameMusicArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let SameMusicArgs {
         common_cli_items,
         reference_directories,
@@ -289,10 +290,10 @@ fn same_music(same_music: SameMusicArgs, stop_flag: &Arc<AtomicBool>, progress_s
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn invalid_symlinks(invalid_symlinks: InvalidSymlinksArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn invalid_symlinks(invalid_symlinks: InvalidSymlinksArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let InvalidSymlinksArgs { common_cli_items, delete_method } = invalid_symlinks;
 
     let mut tool = InvalidSymlinks::new();
@@ -302,10 +303,10 @@ fn invalid_symlinks(invalid_symlinks: InvalidSymlinksArgs, stop_flag: &Arc<Atomi
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn broken_files(broken_files: BrokenFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn broken_files(broken_files: BrokenFilesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let BrokenFilesArgs {
         common_cli_items,
         delete_method,
@@ -324,10 +325,10 @@ fn broken_files(broken_files: BrokenFilesArgs, stop_flag: &Arc<AtomicBool>, prog
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn similar_videos(similar_videos: SimilarVideosArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn similar_videos(similar_videos: SimilarVideosArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let SimilarVideosArgs {
         reference_directories,
         common_cli_items,
@@ -363,10 +364,10 @@ fn similar_videos(similar_videos: SimilarVideosArgs, stop_flag: &Arc<AtomicBool>
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn bad_extensions(bad_extensions: BadExtensionsArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn bad_extensions(bad_extensions: BadExtensionsArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let BadExtensionsArgs { common_cli_items, fix_extensions } = bad_extensions;
 
     let params = BadExtensionsParameters::new();
@@ -381,10 +382,10 @@ fn bad_extensions(bad_extensions: BadExtensionsArgs, stop_flag: &Arc<AtomicBool>
         tool.fix_items(stop_flag, Some(progress_sender), fix_params);
     }
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn bad_names(bad_names: BadNamesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn bad_names(bad_names: BadNamesArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let BadNamesArgs {
         common_cli_items,
         delete_method,
@@ -426,10 +427,10 @@ fn bad_names(bad_names: BadNamesArgs, stop_flag: &Arc<AtomicBool>, progress_send
         tool.fix_items(stop_flag, Some(progress_sender), fix_params);
     }
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn video_optimizer(video_optimizer: VideoOptimizerArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn video_optimizer(video_optimizer: VideoOptimizerArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     use crate::commands::{CropArgs, TranscodeArgs, VideoOptimizerMode as CliVideoOptimizerMode};
 
     let VideoOptimizerArgs { common_cli_items, mode } = video_optimizer;
@@ -482,7 +483,7 @@ fn video_optimizer(video_optimizer: VideoOptimizerArgs, stop_flag: &Arc<AtomicBo
                 tool.fix_items(stop_flag, Some(progress_sender), fix_params);
             }
 
-            save_and_write_results_to_writer(&tool, &common_cli_items)
+            save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
         }
         CliVideoOptimizerMode::Crop(crop_args) => {
             let CropArgs {
@@ -534,12 +535,12 @@ fn video_optimizer(video_optimizer: VideoOptimizerArgs, stop_flag: &Arc<AtomicBo
                 tool.fix_items(stop_flag, Some(progress_sender), fix_params);
             }
 
-            save_and_write_results_to_writer(&tool, &common_cli_items)
+            save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
         }
     }
 }
 
-fn exif_remover(exif_remover: ExifRemoverArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn exif_remover(exif_remover: ExifRemoverArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let ExifRemoverArgs {
         common_cli_items,
         ignored_tags,
@@ -561,10 +562,10 @@ fn exif_remover(exif_remover: ExifRemoverArgs, stop_flag: &Arc<AtomicBool>, prog
         tool.fix_items(stop_flag, Some(progress_sender), fix_params);
     }
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
 
-fn save_and_write_results_to_writer<T: CommonData + PrintResults>(component: &T, common_cli_items: &CommonCliItems) -> CliOutput {
+fn save_and_write_results_to_writer<T: CommonData + PrintResults>(component: &T, common_cli_items: &CommonCliItems, tool_type: &str) -> CliOutput {
     let mut had_save_errors = false;
 
     match common_cli_items.file_to_save.file_name() {
@@ -604,6 +605,46 @@ fn save_and_write_results_to_writer<T: CommonData + PrintResults>(component: &T,
         None => {}
     }
 
+    // --json-compact-stdout: write a stable JSON envelope to stdout
+    if common_cli_items.json_compact_stdout {
+        let messages = component.get_text_messages();
+        let mut msg_list: Vec<String> = Vec::new();
+        for w in &messages.warnings {
+            msg_list.push(format!("[warning] {w}"));
+        }
+        for e in &messages.errors {
+            msg_list.push(format!("[error] {e}"));
+        }
+        for m in &messages.messages {
+            msg_list.push(m.clone());
+        }
+
+        // Serialize results via temp file, then read back as raw JSON value
+        let results_json = match write_results_json_to_buffer(component) {
+            Ok(buf) => {
+                serde_json::from_slice::<serde_json::Value>(&buf).unwrap_or(serde_json::Value::Null)
+            }
+            Err(e) => {
+                error!("Failed to serialize results for stdout envelope: {e}");
+                had_save_errors = true;
+                serde_json::Value::Null
+            }
+        };
+
+        let envelope = serde_json::json!({
+            "schema_version": 1,
+            "tool_type": tool_type,
+            "results": results_json,
+            "messages": msg_list,
+        });
+
+        if let Err(e) = serde_json::to_writer(std::io::stdout().lock(), &envelope) {
+            error!("Failed to write JSON envelope to stdout: {e}");
+            had_save_errors = true;
+        }
+        println!(); // trailing newline
+    }
+
     let mut buf_writer = std::io::BufWriter::new(Vec::new());
     if !common_cli_items.do_not_print.do_not_print_results {
         if let Err(e) = component.print_results_to_writer(&mut buf_writer) {
@@ -633,6 +674,16 @@ fn save_and_write_results_to_writer<T: CommonData + PrintResults>(component: &T,
     }
 
     cli_output
+}
+
+fn write_results_json_to_buffer<T: PrintResults>(component: &T) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    let tmp = tempfile::NamedTempFile::new()?;
+    let path = tmp.path().to_string_lossy().to_string();
+    component.save_results_to_file_as_json(&path, false)?;
+    let mut buf = Vec::new();
+    std::fs::File::open(&path)?.read_to_end(&mut buf)?;
+    Ok(buf)
 }
 
 fn set_simple_delete<T>(component: &mut T, s_delete: SDMethod)
@@ -678,7 +729,7 @@ where
     component.set_use_cache(!common_cli_items.disable_cache);
 }
 
-fn similar_documents(args: SimilarDocumentsArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>) -> CliOutput {
+fn similar_documents(args: SimilarDocumentsArgs, stop_flag: &Arc<AtomicBool>, progress_sender: &Sender<ProgressData>, tool_type: &str) -> CliOutput {
     let SimilarDocumentsArgs {
         common_cli_items,
         delete_method,
@@ -699,5 +750,5 @@ fn similar_documents(args: SimilarDocumentsArgs, stop_flag: &Arc<AtomicBool>, pr
 
     tool.search(stop_flag, Some(progress_sender));
 
-    save_and_write_results_to_writer(&tool, &common_cli_items)
+    save_and_write_results_to_writer(&tool, &common_cli_items, tool_type)
 }
