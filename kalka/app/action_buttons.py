@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QPushButton, QSizePolicy, QMenu, QToolButton
 )
-from PySide6.QtCore import Signal, QSize
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QIcon
 
 from .models import ActiveTab, GROUPED_TABS
 from .icons import (
@@ -10,17 +11,40 @@ from .icons import (
     icon_clean, icon_optimize, icon_dir,
 )
 from .localizer import tr
+from .utils import ICON_SMALL_MEDIUM, MEDIUM_SPACING, LARGE_SPACING
+
+# FreeDesktop theme icon names with fallback to bundled SVGs
+_THEME_ICONS = {
+    "scan": ("system-search", icon_search),
+    "stop": ("process-stop", icon_stop),
+    "select": ("edit-select-all", icon_select),
+    "delete": ("edit-delete", icon_delete),
+    "move": ("document-save-as", icon_move),
+    "save": ("document-save", icon_save),
+    "load": ("document-open", icon_dir),
+    "sort": ("view-sort-ascending", icon_sort),
+    "hardlink": ("edit-link", icon_hardlink),
+    "symlink": ("edit-link", icon_symlink),
+    "rename": ("edit-rename", icon_rename),
+    "clean": ("edit-clear", icon_clean),
+    "optimize": ("media-playback-start", icon_optimize),
+}
 
 
-def _make_btn(icon_fn, label_key: str, signal, layout) -> QPushButton:
-    """Create and register an icon button with standard sizing."""
-    btn = QPushButton(icon_fn(18), " " + tr(label_key))
-    btn.setIconSize(ICON_SIZE)
+def _themed_icon(key: str) -> QIcon:
+    """Try FreeDesktop theme icon first, fall back to bundled SVG."""
+    theme_name, fallback_fn = _THEME_ICONS[key]
+    icon = QIcon.fromTheme(theme_name)
+    return icon if not icon.isNull() else fallback_fn(22)
+
+
+def _make_btn(key: str, label_key: str, signal, layout) -> QPushButton:
+    """Create and register an icon button with KDE HIG sizing."""
+    btn = QPushButton(_themed_icon(key), " " + tr(label_key))
+    btn.setIconSize(ICON_SMALL_MEDIUM)
     btn.clicked.connect(signal.emit)
     layout.addWidget(btn)
     return btn
-
-ICON_SIZE = QSize(18, 18)
 
 
 class ActionButtons(QWidget):
@@ -55,34 +79,34 @@ class ActionButtons(QWidget):
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(4)
+        layout.setContentsMargins(LARGE_SPACING, MEDIUM_SPACING, LARGE_SPACING, MEDIUM_SPACING)
+        layout.setSpacing(MEDIUM_SPACING)
 
-        self._scan_btn = _make_btn(icon_search, "scan-button", self.scan_clicked, layout)
+        self._scan_btn = _make_btn("scan", "scan-button", self.scan_clicked, layout)
         self._scan_btn.setMinimumWidth(90)
 
-        self._stop_btn = _make_btn(icon_stop, "stop-button", self.stop_clicked, layout)
+        self._stop_btn = _make_btn("stop", "stop-button", self.stop_clicked, layout)
         self._stop_btn.setMinimumWidth(80)
         self._stop_btn.setVisible(False)
 
         spacer = QWidget()
-        spacer.setFixedWidth(10)
+        spacer.setFixedWidth(LARGE_SPACING)
         layout.addWidget(spacer)
 
-        self._select_btn = _make_btn(icon_select, "select-button", self.select_clicked, layout)
-        self._delete_btn = _make_btn(icon_delete, "delete-button", self.delete_clicked, layout)
-        self._move_btn = _make_btn(icon_move, "move-button", self.move_clicked, layout)
-        self._save_btn = _make_btn(icon_save, "save-button", self.save_clicked, layout)
+        self._select_btn = _make_btn("select", "select-button", self.select_clicked, layout)
+        self._delete_btn = _make_btn("delete", "delete-button", self.delete_clicked, layout)
+        self._move_btn = _make_btn("move", "move-button", self.move_clicked, layout)
+        self._save_btn = _make_btn("save", "save-button", self.save_clicked, layout)
 
-        self._load_btn = _make_btn(icon_dir, "load-button", self.load_clicked, layout)
+        self._load_btn = _make_btn("load", "load-button", self.load_clicked, layout)
         self._load_btn.setToolTip(tr("load-button-tooltip"))
 
-        self._sort_btn = _make_btn(icon_sort, "sort-button", self.sort_clicked, layout)
-        self._hardlink_btn = _make_btn(icon_hardlink, "hardlink-button", self.hardlink_clicked, layout)
-        self._symlink_btn = _make_btn(icon_symlink, "symlink-button", self.symlink_clicked, layout)
-        self._rename_btn = _make_btn(icon_rename, "rename-button", self.rename_clicked, layout)
-        self._clean_exif_btn = _make_btn(icon_clean, "clean-exif-button", self.clean_exif_clicked, layout)
-        self._optimize_btn = _make_btn(icon_optimize, "optimize-button", self.optimize_video_clicked, layout)
+        self._sort_btn = _make_btn("sort", "sort-button", self.sort_clicked, layout)
+        self._hardlink_btn = _make_btn("hardlink", "hardlink-button", self.hardlink_clicked, layout)
+        self._symlink_btn = _make_btn("symlink", "symlink-button", self.symlink_clicked, layout)
+        self._rename_btn = _make_btn("rename", "rename-button", self.rename_clicked, layout)
+        self._clean_exif_btn = _make_btn("clean", "clean-exif-button", self.clean_exif_clicked, layout)
+        self._optimize_btn = _make_btn("optimize", "optimize-button", self.optimize_video_clicked, layout)
 
         # Stretch at the end
         layout.addStretch()

@@ -72,7 +72,7 @@ class SettingsPanel(QWidget):
         lang_layout = QHBoxLayout()
         lang_layout.addWidget(self._language_combo)
         self._lang_restart_label = QLabel(tr("settings-language-restart"))
-        self._lang_restart_label.setStyleSheet("color: gray; font-style: italic;")
+        self._lang_restart_label.setEnabled(False)  # Uses disabled palette color (theme-aware)
         lang_layout.addWidget(self._lang_restart_label)
         lang_layout.addStretch()
         layout.addRow(tr("settings-language"), lang_layout)

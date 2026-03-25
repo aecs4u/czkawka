@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 
 from .models import ActiveTab, ScanProgress
+from .utils import MEDIUM_SPACING, GRID_UNIT
 from .localizer import tr
 
 
@@ -58,18 +59,22 @@ class ProgressWidget(QWidget):
         layout.addLayout(row1)
 
         # Row 2: current stage bar  "Current"  NN%
+        label_w = GRID_UNIT * 3   # ~54px, DPI-friendly
+        pct_w = GRID_UNIT * 2 + MEDIUM_SPACING  # ~42px
+        bar_h = GRID_UNIT         # ~18px, readable on HiDPI
+
         row2 = QHBoxLayout()
-        row2.setSpacing(6)
+        row2.setSpacing(MEDIUM_SPACING)
         lbl2 = QLabel(tr("progress-current"))
         lbl2.setEnabled(False)
-        lbl2.setFixedWidth(48)
+        lbl2.setFixedWidth(label_w)
         row2.addWidget(lbl2)
         self._stage_bar = QProgressBar()
-        self._stage_bar.setFixedHeight(14)
+        self._stage_bar.setFixedHeight(bar_h)
         self._stage_bar.setTextVisible(False)
         row2.addWidget(self._stage_bar)
         self._stage_pct = QLabel("")
-        self._stage_pct.setFixedWidth(40)
+        self._stage_pct.setFixedWidth(pct_w)
         self._stage_pct.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._stage_pct.setEnabled(False)
         row2.addWidget(self._stage_pct)
@@ -77,17 +82,17 @@ class ProgressWidget(QWidget):
 
         # Row 3: overall bar  "Overall"  NN%
         row3 = QHBoxLayout()
-        row3.setSpacing(6)
+        row3.setSpacing(MEDIUM_SPACING)
         lbl3 = QLabel(tr("progress-overall"))
         lbl3.setEnabled(False)
-        lbl3.setFixedWidth(48)
+        lbl3.setFixedWidth(label_w)
         row3.addWidget(lbl3)
         self._overall_bar = QProgressBar()
-        self._overall_bar.setFixedHeight(14)
+        self._overall_bar.setFixedHeight(bar_h)
         self._overall_bar.setTextVisible(False)
         row3.addWidget(self._overall_bar)
         self._overall_pct = QLabel("")
-        self._overall_pct.setFixedWidth(40)
+        self._overall_pct.setFixedWidth(pct_w)
         self._overall_pct.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._overall_pct.setEnabled(False)
         row3.addWidget(self._overall_pct)

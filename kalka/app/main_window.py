@@ -43,6 +43,11 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self._apply_theme()
 
+        # Live theme switching: re-derive palette colors when system theme changes
+        QApplication.instance().paletteChanged.connect(
+            lambda: self._results_view._ensure_header_colors()
+        )
+
     def _setup_window(self):
         self.setWindowTitle(tr("main-window-title"))
         self.setMinimumSize(900, 600)
@@ -166,6 +171,7 @@ class MainWindow(QMainWindow):
         self._scan_runner.finished.connect(self._on_scan_finished)
         self._scan_runner.progress.connect(self._on_scan_progress)
         self._scan_runner.error.connect(self._on_scan_error)
+        self._scan_runner.diagnostics.connect(self._on_scan_diagnostics)
 
         # Settings
         self._settings_panel.close_requested.connect(
@@ -252,6 +258,11 @@ class MainWindow(QMainWindow):
         self._bottom_panel.set_text(tr("status-error", message=error_msg))
         self._bottom_panel.show_text()
         QMessageBox.critical(self, tr("scan-error-title"), error_msg)
+
+    def _on_scan_diagnostics(self, lines: list):
+        if lines:
+            self._bottom_panel.set_text("\n".join(lines))
+            self._bottom_panel.show_text()
 
     def _on_item_activated(self, entry):
         path = entry.values.get("__full_path", "")
@@ -548,27 +559,27 @@ class MainWindow(QMainWindow):
     def _apply_theme(self):
         """Apply minimal styling that works with the system theme.
 
-        KDE compliance: we inherit the desktop theme (Breeze, Adwaita, etc.)
-        and only add small layout tweaks that don't override colors.
+        KDE HIG compliance: inherit the desktop theme (Breeze, Adwaita, etc.)
+        and only add layout polish using Kirigami-equivalent spacing.
+        No color overrides — the system palette drives all colors.
         """
+        from .utils import SMALL_SPACING, MEDIUM_SPACING, LARGE_SPACING, CORNER_RADIUS
         app = QApplication.instance()
 
-        # Only apply layout polish — no color overrides so the system
-        # theme (Breeze dark/light, Adwaita, etc.) is fully respected.
-        app.setStyleSheet("""
-            QSplitter::handle { width: 2px; }
-            QTreeWidget::item { padding: 2px; }
-            QListWidget::item { padding: 3px; }
-            QGroupBox { border-radius: 4px; margin-top: 8px; padding-top: 8px; }
-            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
-            QPushButton { padding: 5px 12px; }
-            QComboBox { padding: 4px; }
-            QLineEdit { padding: 4px; }
-            QSpinBox { padding: 4px; }
-            QProgressBar { text-align: center; }
-            QScrollArea { border: none; }
-            QCheckBox { spacing: 6px; }
-            QHeaderView::section { padding: 4px; }
+        app.setStyleSheet(f"""
+            QSplitter::handle {{ width: 2px; }}
+            QTreeWidget::item {{ padding: {SMALL_SPACING}px; }}
+            QListWidget::item {{ padding: {SMALL_SPACING}px; }}
+            QGroupBox {{ border-radius: {CORNER_RADIUS}px; margin-top: {LARGE_SPACING}px; padding-top: {LARGE_SPACING}px; }}
+            QGroupBox::title {{ subcontrol-origin: margin; left: {LARGE_SPACING}px; padding: 0 {SMALL_SPACING}px; }}
+            QPushButton {{ padding: {SMALL_SPACING + 1}px {LARGE_SPACING + SMALL_SPACING}px; }}
+            QComboBox {{ padding: {SMALL_SPACING}px; }}
+            QLineEdit {{ padding: {SMALL_SPACING}px; }}
+            QSpinBox {{ padding: {SMALL_SPACING}px; }}
+            QProgressBar {{ text-align: center; }}
+            QScrollArea {{ border: none; }}
+            QCheckBox {{ spacing: {MEDIUM_SPACING}px; }}
+            QHeaderView::section {{ padding: {SMALL_SPACING}px; }}
         """)
 
     def _auto_detect_cli(self):
